@@ -142,46 +142,24 @@ def get_account_overall():
 
 # ——— Stock Endpoints ———
 def get_stock_create_order():
-    kind = input("Emir tipi (1=Stock, 2=Future): ").strip()
     port = int(input("Portfolio Number: ").strip())
-    if kind == '1':
-        symbol = input("Equity Code: ").strip()
-        qty    = int(input("Quantity: ").strip())
-        direction = int(input("Direction (1=Buy, 2=Sell): ").strip())
-        price  = int(input("Price: ").strip())
-        method = int(input("Order Method: ").strip())
-        duration = int(input("Order Duration: ").strip())
-        mra = input("Market Risk Approval? (y/n): ").strip().lower() in ('y','e','yes','true')
-        resp = api.get_stock_create_order(
-            portfolio_number=port,
-            equity_code=symbol,
-            quantity=qty,
-            direction=direction,
-            price=price,
-            order_method=method,
-            order_duration=duration,
-            market_risk_approval=mra
-        )
-    else:
-        contract = input("Contract Code: ").strip()
-        direction = int(input("Direction (1=Long, 2=Short): ").strip())
-        price  = int(input("Price: ").strip())
-        qty    = int(input("Quantity: ").strip())
-        method = int(input("Order Method: ").strip())
-        duration = int(input("Order Duration: ").strip())
-        ahs = input("After Hour Valid? (y/n): ").strip().lower() in ('y','e','yes','true')
-        exp_date = input("Expiration Date (YYYY-MM-DD): ").strip()
-        resp = api.get_future_create_order(
-            portfolio_number=port,
-            contract_code=contract,
-            direction=direction,
-            price=price,
-            quantity=qty,
-            order_method=method,
-            order_duration=duration,
-            after_hour_session_valid=ahs,
-            expiration_date=exp_date
-        )
+    symbol = input("Equity Code: ").strip()
+    qty    = int(input("Quantity: ").strip())
+    direction = int(input("Direction (1=Buy, 2=Sell): ").strip())
+    price  = int(input("Price: ").strip())
+    method = int(input("Order Method: ").strip())
+    duration = int(input("Order Duration: ").strip())
+    mra = input("Market Risk Approval? (y/n): ").strip().lower() in ('y','e','yes','true')
+    resp = api.get_stock_create_order(
+        portfolio_number=port,
+        equity_code=symbol,
+        quantity=qty,
+        direction=direction,
+        price=price,
+        order_method=method,
+        order_duration=duration,
+        market_risk_approval=mra
+    )
     print("Response:", resp)
 
 def get_stock_replace_order():

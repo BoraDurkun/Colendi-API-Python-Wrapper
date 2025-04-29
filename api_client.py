@@ -401,10 +401,9 @@ class WebSocket:
         }
 
         # Bağlantıyı aç
-        self._ws = await websockets.connect(self.ws_url, extra_headers=headers)
+        self._ws = await websockets.connect(self.ws_url, additional_headers=headers)
         if self.verbose:
             print(f"✅ WebSocket bağlantısı kuruldu: {self.ws_url}")
-
         # Gelen mesajları dinlemeye başla
         asyncio.create_task(self._receive_loop())
         # Periyodik heartbeat döngüsünü başlat

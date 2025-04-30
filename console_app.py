@@ -402,7 +402,7 @@ def main():
         api_url    = API_URL,
         api_key    = API_KEY,
         secret_key = API_SECRET,
-        verbose    = False
+        verbose    = True
     )
 
     # Eğer kaydedilmiş geçerli bir token yoksa, OTP+login ile al

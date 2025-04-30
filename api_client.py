@@ -9,6 +9,17 @@ import requests
 import asyncio
 import websockets
 import os
+import logging
+
+logging.basicConfig(
+    filename='logs.log',          
+    filemode='w',                       
+    level=logging.INFO,
+    format='%(asctime)s %(name)s %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+logger = logging.getLogger("api_client")
 
 class API:
     """
@@ -58,16 +69,16 @@ class API:
         self._jwt_token = self._load_saved_token()
         if self._jwt_token:
             if self.verbose:
-                print(f"✅ Yüklendi: {self.TOKEN_FILE}")
+                logger.info(f"✅ Yüklendi: {self.TOKEN_FILE}")
             resp = self.get_subaccounts()
             stat = resp["statusCode"]
             
             if stat == 200:
                 if self.verbose:
-                    print("✅ Kaydedilmiş token geçerli.")
+                    logger.info("✅ Kaydedilmiş token geçerli.")
             else:
                 if self.verbose:
-                    print(f"❌ Kaydedilmiş token geçersiz ({stat}), temizleniyor.")
+                    logger.warning(f"❌ Kaydedilmiş token geçersiz ({stat}), temizleniyor.")
                 self._jwt_token = ""
                 self._clear_saved_token()
 
@@ -93,10 +104,10 @@ class API:
             try:
                 self.get_subaccounts()
                 if self.verbose:
-                    print("🔄 Session refreshed via get_subaccounts()")
+                    logger.info("🔄 Session refreshed via get_subaccounts()")
             except Exception as e:
                 if self.verbose:
-                    print(f"❌ Session refresh failed: {e}")
+                    logger.warning(f"❌ Session refresh failed: {e}")
 
     # ——— Token helper’ları ———
     @classmethod
@@ -113,7 +124,7 @@ class API:
             return data.get("jwtToken", "")
         except Exception as e:
             # Hata varsa dosyayı sıfırla
-            print(f"Hata oluştu: {e}. Token dosyası sıfırlanıyor.")
+            logger.warning(f"Hata oluştu: {e}. Token dosyası sıfırlanıyor.")
             with open(cls.TOKEN_FILE, "w", encoding="utf-8") as f:
                 json.dump({"jwtToken": ""}, f, ensure_ascii=False)
             return ""
@@ -184,7 +195,8 @@ class API:
         url = f"{self._api_url}{path}"
         resp = requests.post(url, data=body_str.encode("utf-8"), headers=headers, timeout=15)
         if self.verbose:
-            print(f"[POST] {path} → status {resp.status_code}, body={body_str}")
+            logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
+            logger.info(f"[RESP] {resp.json()}")            
         return resp.json()
 
     # ————— Authentication —————
@@ -206,7 +218,7 @@ class API:
         self._jwt_token = resp["data"]["jwtToken"]
         self._save_token()
         if self.verbose:
-            print("✅ Login successful, JWT token stored.")
+            logger.info("✅ Login successful, JWT token stored.")
         return resp
 
     # ————— Portfolio Endpoints —————
@@ -478,7 +490,7 @@ class WebSocket:
         # Bağlantıyı aç
         self._ws = await websockets.connect(self.ws_url, additional_headers=headers)
         if self.verbose:
-            print(f"✅ WebSocket bağlantısı kuruldu: {self.ws_url}")
+            logger.info(f"✅ WebSocket bağlantısı kuruldu: {self.ws_url}")
         # Gelen mesajları dinlemeye başla
         asyncio.create_task(self._receive_loop())
         # Periyodik heartbeat döngüsünü başlat
@@ -487,7 +499,7 @@ class WebSocket:
     async def _receive_loop(self):
         """
         WebSocket üzerinden gelen her mesajı alır.
-        Eğer on_message callback atanmışsa oraya, değilse verbose modda print'e yollar.
+        Eğer on_message callback atanmışsa oraya, değilse verbose modda logger.info'e yollar.
         Bağlantı kapanırsa otomatik reconnect dener.
         """
         assert self._ws is not None
@@ -496,10 +508,10 @@ class WebSocket:
                 if callable(self.on_message):
                     self.on_message(msg)
                 elif self.verbose:
-                    print("Gelen mesaj:", msg)
+                    logger.info("Gelen mesaj:", msg)
         except websockets.ConnectionClosed:
             if self.verbose:
-                print("🔄 Bağlantı kapandı, yeniden bağlanılıyor...")
+                logger.info("🔄 Bağlantı kapandı, yeniden bağlanılıyor...")
             await self.connect()
 
     async def _send_loop(self):
@@ -529,7 +541,7 @@ class WebSocket:
         msg = json.dumps(payload)
         await self._ws.send(msg)
         if self.verbose:
-            print("Gönderilen mesaj:", msg)
+            logger.info("Gönderilen mesaj:", msg)
 
     def start(self):
         """

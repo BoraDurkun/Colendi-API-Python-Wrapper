@@ -8,12 +8,13 @@ from typing import Any, Dict, Optional, Callable
 import requests
 import asyncio
 import websockets
+import os
 
 class API:
     """
     Singleton HMAC‐imzalı REST API istemcisi.
     """
-
+    TOKEN_FILE = "api_settings.json"
     _instance: Optional["API"] = None
     _lock = threading.Lock()
 
@@ -48,13 +49,87 @@ class API:
         verbose: bool
     ):
         self.verbose      = verbose
-        self._api_url     = api_url.rstrip("/")      # Örneğin "https://api.example.com"
+        self._api_url     = api_url.rstrip("/")
         self._client_key  = api_key
         self._secret_key  = secret_key
-        self._jwt_token   = ""                        # login sonrası dolacak
-        self._last_req    = 0.0                       # saniyede 1 istek throttle
+        self._last_req = 0.0
+        
+        # --- Token yükleme ve geçerlilik kontrolü (evvelden eklediğimiz) ---
+        self._jwt_token = self._load_saved_token()
+        if self._jwt_token:
+            if self.verbose:
+                print(f"✅ Yüklendi: {self.TOKEN_FILE}")
+            resp = self.get_subaccounts()
+            stat = resp["statusCode"]
+            
+            if stat == 200:
+                if self.verbose:
+                    print("✅ Kaydedilmiş token geçerli.")
+            else:
+                if self.verbose:
+                    print(f"❌ Kaydedilmiş token geçersiz ({stat}), temizleniyor.")
+                self._jwt_token = ""
+                self._clear_saved_token()
+
+        # --- AUTO SESSION REFRESH başlat ---
+        self._start_session_refresher()
 
     # ————— HELPERS —————
+        # ————— AUTO-SESSION REFRESH MEKANİZMASI —————
+    def _start_session_refresher(self):
+        """
+        Arka planda daemon thread ile her 60 saniyede bir
+        get_subaccounts() çağırıp session'ı yeniler.
+        """
+        thread = threading.Thread(target=self._session_refresher_loop, daemon=True)
+        thread.start()
+
+    def _session_refresher_loop(self):
+        while True:
+            time.sleep(60)
+            if not self._jwt_token:
+                # Henüz login olunmadıysa atla
+                continue
+            try:
+                self.get_subaccounts()
+                if self.verbose:
+                    print("🔄 Session refreshed via get_subaccounts()")
+            except Exception as e:
+                if self.verbose:
+                    print(f"❌ Session refresh failed: {e}")
+
+    # ——— Token helper’ları ———
+    @classmethod
+    def _load_saved_token(cls) -> str:
+        # Dosya yoksa oluştur ve boş token döndür
+        if not os.path.isfile(cls.TOKEN_FILE):
+            with open(cls.TOKEN_FILE, "w", encoding="utf-8") as f:
+                json.dump({"jwtToken": ""}, f, ensure_ascii=False)
+            return ""
+        # Var olan dosyayı oku
+        try:
+            with open(cls.TOKEN_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get("jwtToken", "")
+        except Exception as e:
+            # Hata varsa dosyayı sıfırla
+            print(f"Hata oluştu: {e}. Token dosyası sıfırlanıyor.")
+            with open(cls.TOKEN_FILE, "w", encoding="utf-8") as f:
+                json.dump({"jwtToken": ""}, f, ensure_ascii=False)
+            return ""
+
+    @classmethod
+    def _clear_saved_token(cls):
+        try:
+            import os
+            os.remove(cls.TOKEN_FILE)
+        except FileNotFoundError:
+            pass
+
+    def _save_token(self):
+        with open(self.TOKEN_FILE, "w", encoding="utf-8") as f:
+            json.dump({"jwtToken": self._jwt_token}, f, ensure_ascii=False)
+        
     def _timestamp(self) -> str:
         return str(int(time.time()))
 
@@ -77,7 +152,7 @@ class API:
         if wait > 0:
             time.sleep(wait)
         self._last_req = time.time()
-
+        
     # ————— CORE REQUEST —————
     def _post(
         self,
@@ -108,7 +183,6 @@ class API:
         self._throttle()
         url = f"{self._api_url}{path}"
         resp = requests.post(url, data=body_str.encode("utf-8"), headers=headers, timeout=15)
-        resp.raise_for_status()
         if self.verbose:
             print(f"[POST] {path} → status {resp.status_code}, body={body_str}")
         return resp.json()
@@ -130,6 +204,7 @@ class API:
                           {"token": token, "otp": otp},
                           require_auth=False)
         self._jwt_token = resp["data"]["jwtToken"]
+        self._save_token()
         if self.verbose:
             print("✅ Login successful, JWT token stored.")
         return resp

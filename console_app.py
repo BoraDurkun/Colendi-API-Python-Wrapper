@@ -411,7 +411,7 @@ def main():
             otp_resp = api.send_otp(USERNAME, PASSWORD)
         except RequestException as e:
             print("❌ OTP isteği sırasında HTTP hatası:", e)
-            sys.exit(1)
+            sys.exit()
 
         data = otp_resp.get("data")
         if not isinstance(data, dict) or "token" not in data:

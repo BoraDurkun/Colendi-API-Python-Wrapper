@@ -6,10 +6,11 @@ import base64
 import json
 from typing import Any, Dict, Optional, Callable
 import requests
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+from cert_handler import ensure_cert_in_env, cleanup_cert_from_env
 
 import asyncio
+from websockets.client import WebSocketClientProtocol # type: ignore
 import websockets
 import os
 import logging
@@ -31,7 +32,7 @@ class API:
     TOKEN_FILE = "api_settings.json"
     _instance: Optional["API"] = None
     _lock = threading.Lock()
-
+    
     @classmethod
     def get_api(
         cls,
@@ -67,14 +68,16 @@ class API:
         self._client_key  = api_key
         self._secret_key  = secret_key
         self._last_req = 0.0
+        self.interval = 1 # İstekler arasında kaç saniye olsun
         
+
         # --- Token yükleme ve geçerlilik kontrolü (evvelden eklediğimiz) ---
         self._jwt_token = self._load_saved_token()
         if self._jwt_token:
             if self.verbose:
                 logger.info(f"✅ Yüklendi: {self.TOKEN_FILE}")
             resp = self.get_subaccounts()
-            stat = resp["statusCode"]
+            stat = resp.get("statusCode", "status")
             
             if stat == 200:
                 if self.verbose:
@@ -162,7 +165,7 @@ class API:
         return base64.b64encode(mac).decode("utf-8")
 
     def _throttle(self):
-        wait = (self._last_req + 1) - time.time()
+        wait = (self._last_req + self.interval) - time.time()
         if wait > 0:
             time.sleep(wait)
         self._last_req = time.time()
@@ -180,6 +183,7 @@ class API:
         `require_auth=False` ise JWT header eklenmez.
         """
         path     = endpoint if endpoint.startswith("/") else f"/{endpoint}"
+        cert_path = ensure_cert_in_env()
         ts       = self._timestamp()
         body_str = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         sig      = self._make_signature(path, body_str, ts)
@@ -196,7 +200,10 @@ class API:
 
         self._throttle()
         url = f"{self._api_url}{path}"
-        resp = requests.post(url, data=body_str.encode("utf-8"), headers=headers, timeout=60, verify=False)
+        resp = requests.post(url, data=body_str.encode("utf-8"),
+                             headers=headers, timeout=60, verify=cert_path)
+        cleanup_cert_from_env()
+        
         if self.verbose and resp.status_code == 200:
             logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
             logger.info(f"[RESP] {resp.json()}")            
@@ -457,7 +464,7 @@ class WebSocket:
 
         # İç durum
         self._last_heartbeat = 0.0
-        self._ws: Optional[websockets.WebSocketClientProtocol] = None
+        self._ws: Optional[WebSocketClientProtocol] = None
 
     def _timestamp(self) -> str:
         """Şu anki Unix timestamp'ini saniye cinsinden string olarak döner."""

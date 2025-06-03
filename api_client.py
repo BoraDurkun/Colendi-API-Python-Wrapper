@@ -6,6 +6,9 @@ import base64
 import json
 from typing import Any, Dict, Optional, Callable
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 import asyncio
 import websockets
 import os
@@ -193,19 +196,22 @@ class API:
 
         self._throttle()
         url = f"{self._api_url}{path}"
-        resp = requests.post(url, data=body_str.encode("utf-8"), headers=headers, timeout=15)
-        if self.verbose:
+        resp = requests.post(url, data=body_str.encode("utf-8"), headers=headers, timeout=60, verify=False)
+        if self.verbose and resp.status_code == 200:
             logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
             logger.info(f"[RESP] {resp.json()}")            
-        return resp.json()
-
+            return resp.json()
+        else:
+            logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
+            return {"status": resp.status_code}
+        
     # ————— Authentication —————
     def send_otp(self, internet_user: str, password: str) -> Dict[str, Any]:
         """
         OTP gönderir. require_auth=False ile JWT header eklenmez.
         """
         return self._post("Identity/SendOtp",
-                          {"InternetUser": internet_user, "Password": password},
+                          {"internetUser": internet_user, "password": password},
                           require_auth=False)
 
     def login(self, token: str, otp: str) -> Dict[str, Any]:

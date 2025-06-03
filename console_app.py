@@ -413,11 +413,6 @@ def main():
             print("❌ OTP isteği sırasında HTTP hatası:", e)
             sys.exit(1)
 
-        # OTP yanıtını kontrol edelim
-        if not isinstance(otp_resp, dict):
-            print("❌ Beklenmeyen OTP yanıtı:", otp_resp)
-            sys.exit(1)
-
         data = otp_resp.get("data")
         if not isinstance(data, dict) or "token" not in data:
             print("❌ OTP yanıtında token bulunamadı:", otp_resp)

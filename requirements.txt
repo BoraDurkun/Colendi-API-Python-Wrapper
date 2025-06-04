@@ -1,4 +1,3 @@
 dotenv
 requests
 websockets
-certifi-win32

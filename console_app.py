@@ -237,9 +237,10 @@ def get_stock_create_order():
     duration  = ask_enum_choice("Order Duration", ORDER_DURATION_MAP)
     mra       = ask_optional_bool("Market Risk Approval?")
 
-    if None in (port, symbol, qty, price, mra):
+    if port is None or symbol is None or qty is None or price is None or mra is None:
         print("❌ Tüm alanlar doldurulmalı.")
         return
+    assert port is not None and symbol is not None and qty is not None and price is not None and mra is not None
 
     if api:
         resp = api.get_stock_create_order(
@@ -260,9 +261,10 @@ def get_stock_replace_order():
     price = ask_optional_int("New Price")
     qty   = ask_optional_int("New Quantity")
 
-    if None in (port, ref, price, qty):
+    if port is None or ref is None or price is None or qty is None:
         print("❌ Tüm alanlar doldurulmalı.")
         return
+    assert port is not None and ref is not None and price is not None and qty is not None
 
     if api:
         resp = api.get_stock_replace_order(
@@ -276,9 +278,10 @@ def get_stock_replace_order():
 def get_stock_delete_order():
     port = ask_optional_int("Portfolio Number")
     ref  = ask_optional_str("Order Ref to delete")
-    if None in (port, ref):
+    if port is None or ref is None:
         print("❌ Tüm alanlar doldurulmalı.")
         return
+    assert port is not None and ref is not None
     if api:
         resp = api.get_stock_delete_order(
             portfolio_number=port,
@@ -298,11 +301,14 @@ def get_stock_order_list():
     page_number      = ask_optional_int("Page Number")
     descending_order = ask_optional_bool("Descending Order?")
 
-    if None in (port, order_status, order_direction, order_method,
-                order_duration, equity_code, equity_type, page_number,
-                descending_order):
+    if (port is None or order_status is None or order_direction is None or
+            order_method is None or order_duration is None or equity_code is None or
+            equity_type is None or page_number is None or descending_order is None):
         print("❌ Tüm alanlar doldurulmalı.")
         return
+    assert (port is not None and order_status is not None and order_direction is not None and
+            order_method is not None and order_duration is not None and equity_code is not None and
+            equity_type is not None and page_number is not None and descending_order is not None)
 
     if api:
         resp = api.get_stock_order_list(
@@ -325,9 +331,12 @@ def get_stock_positions():
     without_dep  = ask_optional_bool("Without Depot?")
     without_t1   = ask_optional_bool("Without T+1 Qty?")
 
-    if None in (port, equity_code, equity_type, without_dep, without_t1):
+    if (port is None or equity_code is None or equity_type is None or
+            without_dep is None or without_t1 is None):
         print("❌ Tüm alanlar doldurulmalı.")
         return
+    assert (port is not None and equity_code is not None and equity_type is not None and
+            without_dep is not None and without_t1 is not None)
 
     if api:
         resp = api.get_stock_positions(
@@ -351,9 +360,14 @@ def get_future_create_order():
     ahs       = ask_optional_bool("After Hour Valid?")
     exp_date  = ask_optional_date("Expiration Date")
 
-    if None in (port, contract, direction, price, qty, method, duration, ahs, exp_date):
+    if (port is None or contract is None or direction is None or price is None or
+            qty is None or method is None or duration is None or ahs is None or
+            exp_date is None):
         print("❌ Tüm alanlar doldurulmalı.")
         return
+    assert (port is not None and contract is not None and direction is not None and
+            price is not None and qty is not None and method is not None and
+            duration is not None and ahs is not None and exp_date is not None)
 
     if api:
         resp = api.get_future_create_order(
@@ -377,9 +391,10 @@ def get_future_replace_order():
     otype    = ask_optional_int("Order Type")
     exp_date = ask_optional_date("Expiration Date")
 
-    if None in (port, ref, qty, price, otype, exp_date):
+    if port is None or ref is None or qty is None or price is None or otype is None or exp_date is None:
         print("❌ Tüm alanlar doldurulmalı.")
         return
+    assert port is not None and ref is not None and qty is not None and price is not None and otype is not None and exp_date is not None
 
     if api:
         resp = api.get_future_replace_order(
@@ -396,9 +411,10 @@ def get_future_delete_order():
     port = ask_optional_int("Portfolio Number")
     ref  = ask_optional_str("Order Ref to delete")
 
-    if None in (port, ref):
+    if port is None or ref is None:
         print("❌ Tüm alanlar doldurulmalı.")
         return
+    assert port is not None and ref is not None
 
     if api:
         resp = api.get_future_delete_order(
@@ -419,20 +435,32 @@ def get_future_order_list():
     cancelled_orders          = ask_optional_bool("Cancelled Orders?")
     after_hour_session_valid  = ask_optional_bool("After Hour Session Valid?")
 
-    if None in (
-        port,
-        order_validity_date,
-        contract_code,
-        contract_type,
-        long_short,
-        pending_orders,
-        untransmitted_orders,
-        partially_executed_orders,
-        cancelled_orders,
-        after_hour_session_valid,
+    if (
+        port is None or
+        order_validity_date is None or
+        contract_code is None or
+        contract_type is None or
+        long_short is None or
+        pending_orders is None or
+        untransmitted_orders is None or
+        partially_executed_orders is None or
+        cancelled_orders is None or
+        after_hour_session_valid is None
     ):
         print("❌ Tüm alanlar doldurulmalı.")
         return
+    assert (
+        port is not None and
+        order_validity_date is not None and
+        contract_code is not None and
+        contract_type is not None and
+        long_short is not None and
+        pending_orders is not None and
+        untransmitted_orders is not None and
+        partially_executed_orders is not None and
+        cancelled_orders is not None and
+        after_hour_session_valid is not None
+    )
 
     if api:
         resp = api.get_future_order_list(

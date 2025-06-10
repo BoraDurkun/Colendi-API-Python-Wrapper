@@ -3,6 +3,7 @@ import sys
 from typing import Optional, cast
 from datetime import datetime
 from requests.exceptions import RequestException
+from rich import print_json
 
 from api_client import API, WebSocket
 from config import *
@@ -212,7 +213,7 @@ def ask_enum_choice(
 def get_subaccounts():
     if api:
         resp = api.get_subaccounts()
-        print(resp)
+        print_json(data=resp)
 
 def get_account_summary():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -221,7 +222,7 @@ def get_account_summary():
     assert port is not None
     if api:
         resp = api.get_account_summary(portfolio_number=port)
-        print(resp)
+        print_json(data=resp)
 
 def get_cash_assets():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -230,7 +231,7 @@ def get_cash_assets():
     assert port is not None
     if api:
         resp = api.get_cash_assets(portfolio_number=port)
-        print(resp)
+        print_json(data=resp)
 
 def get_cash_balance():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -239,7 +240,7 @@ def get_cash_balance():
     assert port is not None
     if api:
         resp = api.get_cash_balance(portfolio_number=port)
-        print(resp)
+        print_json(data=resp)
 
 def get_account_overall():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -248,7 +249,7 @@ def get_account_overall():
     assert port is not None
     if api:
         resp = api.get_account_overall(portfolio_number=port)
-        print(resp)
+        print_json(data=resp)
 
 # ——— Stock Endpoints ———
 def get_stock_create_order():
@@ -276,7 +277,7 @@ def get_stock_create_order():
             order_duration=duration,
             market_risk_approval=mra
         )
-        print("Response:", resp)
+        print_json(data=resp)
 
 def get_stock_replace_order():
     port  = ask_optional_int("Portfolio Number", required=True)
@@ -295,7 +296,7 @@ def get_stock_replace_order():
             price=price,
             quantity=qty
         )
-        print("Response:", resp)
+        print_json(data=resp)
 
 def get_stock_delete_order():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -308,7 +309,7 @@ def get_stock_delete_order():
             portfolio_number=port,
             order_ref=ref
         )
-        print("Response:", resp)
+        print_json(data=resp)
 
 def get_stock_order_list():
     port             = ask_optional_int("Portfolio Number", required=True)
@@ -338,7 +339,7 @@ def get_stock_order_list():
             page_number=page_number,
             descending_order=descending_order
         )
-        print("Response:", resp)
+        print_json(data=resp)
 
 def get_stock_positions():
     port         = ask_optional_int("Portfolio Number", required=True)
@@ -360,24 +361,23 @@ def get_stock_positions():
             without_depot=without_dep,
             without_t1_qty=without_t1
         )
-        print("Response:", resp)
+        print_json(data=resp)
 
 # ——— Future Endpoints ———
 def get_future_create_order():
-    port      = ask_optional_int("Portfolio Number")
-    contract  = ask_optional_str("Contract Code")
-    direction = ask_optional_int("Direction (1=Long, 2=Short)")
-    price     = ask_optional_int("Price")
-    qty       = ask_optional_int("Quantity")
-    method    = ask_optional_int("Order Method")
-    duration  = ask_optional_int("Order Duration")
-    ahs       = ask_optional_bool("After Hour Valid?")
-    exp_date  = ask_optional_date("Expiration Date")
+    port      = ask_optional_int("Portfolio Number", required=True)
+    contract  = ask_optional_str("Contract Code", required=True)
+    direction = ask_enum_choice("Direction", VIOP_LONG_SHORT_MAP, required=True)
+    price     = ask_optional_float("Price", required=True)
+    qty       = ask_optional_int("Quantity", required=True)
+    method    = ask_enum_choice("Order Method", ORDER_METHOD_MAP, required=True)
+    duration  = ask_enum_choice("Order Duration", ORDER_DURATION_MAP, required=True)
+    ahs       = ask_optional_bool("After Hour Valid?", required=True)
+    exp_date  = ask_optional_date("Expiration Date", required=True)
 
     if (port is None or contract is None or direction is None or price is None or
             qty is None or method is None or duration is None or ahs is None or
             exp_date is None):
-        print("❌ Tüm alanlar doldurulmalı.")
         return
     assert (port is not None and contract is not None and direction is not None and
             price is not None and qty is not None and method is not None and
@@ -395,18 +395,17 @@ def get_future_create_order():
             after_hour_session_valid=ahs,
             expiration_date=exp_date
         )
-        print("Response:", resp)
+        print_json(data=resp)
 
 def get_future_replace_order():
-    port     = ask_optional_int("Portfolio Number")
-    ref      = ask_optional_str("Order Ref")
-    qty      = ask_optional_int("New Quantity")
-    price    = ask_optional_int("New Price")
-    otype    = ask_optional_int("Order Type")
-    exp_date = ask_optional_date("Expiration Date")
+    port     = ask_optional_int("Portfolio Number", required=True)
+    ref      = ask_optional_str("Order Ref", required=True)
+    qty      = ask_optional_int("New Quantity", required=True)
+    price    = ask_optional_float("New Price", required=True)
+    otype    = ask_enum_choice("Order Type", ORDER_DURATION_MAP, required=True)
+    exp_date = ask_optional_date("Expiration Date", required=True)
 
     if port is None or ref is None or qty is None or price is None or otype is None or exp_date is None:
-        print("❌ Tüm alanlar doldurulmalı.")
         return
     assert port is not None and ref is not None and qty is not None and price is not None and otype is not None and exp_date is not None
 
@@ -419,14 +418,13 @@ def get_future_replace_order():
             order_type=otype,
             expiration_date=exp_date
         )
-        print("Response:", resp)
+        print_json(data=resp)
 
 def get_future_delete_order():
-    port = ask_optional_int("Portfolio Number")
-    ref  = ask_optional_str("Order Ref to delete")
+    port = ask_optional_int("Portfolio Number", required=True)
+    ref  = ask_optional_str("Order Ref to delete", required=True)
 
     if port is None or ref is None:
-        print("❌ Tüm alanlar doldurulmalı.")
         return
     assert port is not None and ref is not None
 
@@ -435,14 +433,14 @@ def get_future_delete_order():
             portfolio_number=port,
             order_ref=ref
         )
-        print("Response:", resp)
+        print_json(data=resp)
 
 def get_future_order_list():
-    port                      = ask_optional_int("Portfolio Number")
+    port                      = ask_optional_int("Portfolio Number", required=True)
     order_validity_date       = ask_optional_date("Order Validity Date")
     contract_code             = ask_optional_str("Contract Code")
-    contract_type             = ask_optional_int("Contract Type")
-    long_short                = ask_optional_int("Long/Short (1/2)")
+    contract_type             = ask_enum_choice("Contract Type", VIOP_CONTRACT_TYPE_MAP)
+    long_short                = ask_enum_choice("Long/Short", VIOP_LONG_SHORT_MAP)
     pending_orders            = ask_optional_bool("Pending Orders?")
     untransmitted_orders      = ask_optional_bool("Untransmitted Orders?")
     partially_executed_orders = ask_optional_bool("Partially Executed Orders?")
@@ -450,30 +448,11 @@ def get_future_order_list():
     after_hour_session_valid  = ask_optional_bool("After Hour Session Valid?")
 
     if (
-        port is None or
-        order_validity_date is None or
-        contract_code is None or
-        contract_type is None or
-        long_short is None or
-        pending_orders is None or
-        untransmitted_orders is None or
-        partially_executed_orders is None or
-        cancelled_orders is None or
-        after_hour_session_valid is None
+        port is None
     ):
-        print("❌ Tüm alanlar doldurulmalı.")
         return
     assert (
-        port is not None and
-        order_validity_date is not None and
-        contract_code is not None and
-        contract_type is not None and
-        long_short is not None and
-        pending_orders is not None and
-        untransmitted_orders is not None and
-        partially_executed_orders is not None and
-        cancelled_orders is not None and
-        after_hour_session_valid is not None
+        port is not None
     )
 
     if api:
@@ -489,16 +468,15 @@ def get_future_order_list():
             cancelled_orders=cancelled_orders,
             after_hour_session_valid=after_hour_session_valid
         )
-        print("Response:", resp)
+        print_json(data=resp)
 
 def get_future_positions():
-    port = ask_optional_int("Portfolio Number")
+    port = ask_optional_int("Portfolio Number", required=True)
     if port is None:
-        print("❌ Portfolio Number gerekli.")
         return
     if api:
         resp = api.get_future_positions(portfolio_number=port)
-        print("Response:", resp)
+        print_json(data=resp)
  
 def main():
     global api

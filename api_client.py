@@ -373,11 +373,11 @@ class API:
         self,
         portfolio_number: int,
         contract_code: str,
-        direction: int,
-        price: int,
+        direction: str,
+        price: float,
         quantity: int,
-        order_method: int,
-        order_duration: int,
+        order_method: str,
+        order_duration: str,
         after_hour_session_valid: bool,
         expiration_date: str
     ) -> Dict[str, Any]:
@@ -399,8 +399,8 @@ class API:
         portfolio_number: int,
         order_ref: str,
         quantity: int,
-        price: int,
-        order_type: int,
+        price: float,
+        order_type: str,
         expiration_date: str
     ) -> Dict[str, Any]:
         return self._post("Future/FutureReplaceOrder", {
@@ -421,15 +421,15 @@ class API:
     def get_future_order_list(
         self,
         portfolio_number: int,
-        order_validity_date: str,
-        contract_code: str,
-        contract_type: int,
-        long_short: int,
-        pending_orders: bool,
-        untransmitted_orders: bool,
-        partially_executed_orders: bool,
-        cancelled_orders: bool,
-        after_hour_session_valid: bool
+        order_validity_date: Optional[str],
+        contract_code: Optional[str],
+        contract_type: Optional[str],
+        long_short: Optional[str],
+        pending_orders: Optional[bool],
+        untransmitted_orders: Optional[bool],
+        partially_executed_orders: Optional[bool],
+        cancelled_orders: Optional[bool],
+        after_hour_session_valid: Optional[bool]
     ) -> Dict[str, Any]:
         return self._post("Future/FutureOrderList", {
             "portfolioNumber":         portfolio_number,

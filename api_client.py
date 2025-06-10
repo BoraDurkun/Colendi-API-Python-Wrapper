@@ -13,6 +13,9 @@ import websockets
 import os
 import logging
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 logging.basicConfig(
     filename='logs.log',          
     filemode='w',                       
@@ -260,34 +263,39 @@ class API:
         price: float,
         order_method: str,
         order_duration: str,
-        market_risk_approval: bool
+        market_risk_approval: Optional[bool] = None
     ) -> Dict[str, Any]:
         payload = {
-            "portfolioNumber":    portfolio_number,
-            "equityCode":         equity_code,
-            "quantity":           quantity,
-            "direction":          direction,
-            "price":              price,
-            "orderMethod":        order_method,
-            "orderDuration":      order_duration,
-            "marketRiskApproval": market_risk_approval,
+            "portfolioNumber": portfolio_number,
+            "equityCode": equity_code,
+            "quantity": quantity,
+            "direction": direction,
+            "price": price,
+            "orderMethod": order_method,
+            "orderDuration": order_duration,
         }
+
+        if market_risk_approval is not None:
+            payload["marketRiskApproval"] = market_risk_approval
+
         return self._post("Stock/StockCreateOrder", payload)
 
     def get_stock_replace_order(
         self,
         portfolio_number: int,
         order_ref: str,
-        price: int,
+        price:  float,
         quantity: int
     ) -> Dict[str, Any]:
-        return self._post("Stock/StockReplaceOrder", {
+        payload= {
             "portfolioNumber": portfolio_number,
-            "orderRef":        order_ref,
-            "price":           price,
-            "quantity":        quantity
-        })
-
+            "orderRef": order_ref,
+            "price" : price,
+            "quantity": quantity
+        }
+        
+        return self._post("Stock/StockReplaceOrder", payload)
+                          
     def get_stock_delete_order(self, portfolio_number: int, order_ref: str) -> Dict[str, Any]:
         return self._post("Stock/StockDeleteOrder", {
             "portfolioNumber": portfolio_number,
@@ -297,42 +305,68 @@ class API:
     def get_stock_order_list(
         self,
         portfolio_number: int,
-        order_status: int,
-        order_direction: int,
-        order_method: int,
-        order_duration: int,
-        equity_code: str,
-        equity_type: int,
+        order_status: Optional[str],
+        order_direction: Optional[str],
+        order_method: Optional[str],
+        order_duration: Optional[str],
+        equity_code: Optional[str],
+        equity_type: Optional[str],
         page_number: int,
-        descending_order: bool
+        descending_order: Optional[bool]
     ) -> Dict[str, Any]:
-        return self._post("Stock/StockOrderList", {
+        payload: Dict[str, Any] = {
             "portfolioNumber":  portfolio_number,
-            "orderStatus":      order_status,
-            "orderDirection":   order_direction,
-            "orderMethod":      order_method,
-            "orderDuration":    order_duration,
-            "equityCode":       equity_code,
-            "equityType":       equity_type,
-            "pageNumber":       page_number,
-            "descendingOrder":  descending_order
-        })
+            "pageNumber":       page_number
+        }
+        
+        if order_status is not None:
+            payload["orderStatus"] = order_status
+
+        if order_direction is not None:
+            payload["orderDirection"] = order_direction
+
+        if order_method is not None:
+            payload["orderMethod"] = order_method
+
+        if order_duration is not None:
+            payload["orderDuration"] = order_duration
+
+        if equity_type is not None:
+            payload["equityType"] = equity_type
+            
+        if equity_code is not None:
+            payload["equityCode"] = equity_code
+
+        if descending_order is not None:
+            payload["descendingOrder"] = descending_order
+            
+        return self._post("Stock/StockOrderList", payload)
 
     def get_stock_positions(
         self,
         portfolio_number: int,
-        equity_code: str,
-        equity_type: int,
-        without_depot: bool,
-        without_t1_qty: bool
+        equity_code: Optional[str],
+        equity_type: Optional[str],
+        without_depot: Optional[bool] = None,
+        without_t1_qty: Optional[bool] = None
     ) -> Dict[str, Any]:
-        return self._post("Stock/StockPositions", {
-            "portfolioNumber": portfolio_number,
-            "equityCode":      equity_code,
-            "equityType":      equity_type,
-            "withOutDepot":    without_depot,
-            "withOutT1Qty":    without_t1_qty
-        })
+        
+        payload: Dict[str, Any] = {
+            "portfolioNumber": portfolio_number
+        }           
+        if equity_code is not None:
+            payload["equityCode"] = equity_code
+
+        if equity_type is not None:
+            payload["equityType"] = equity_type   
+
+        if without_depot is not None:
+            payload["withOutDepot"] = without_depot
+            
+        if without_t1_qty is not None:
+            payload["withOutT1Qty"] = without_t1_qty
+            
+        return self._post("Stock/StockPositions", payload)
 
     # ————— Future Endpoints —————
     def get_future_create_order(

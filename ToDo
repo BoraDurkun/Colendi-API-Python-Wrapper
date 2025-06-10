@@ -1,3 +1,0 @@
-- ask_optional_... değerini ask_... olan ile değiştir ve Optional değerleri required veya değil olarak swaggerdan bakarak sırala 
-- string olarak girilmesi gereken ifadeleri enums.pyden .ek ve bu fonksiyonları düzelt
-- Lisans düzelince cert_handler.py sil ve eski yapıya dön

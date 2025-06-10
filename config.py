@@ -21,15 +21,10 @@ API_WS_URL = "wss://api.codyalgo.com:11443/ws"
 # Hesap Kimlik Bilgileri
 # ——————————————————————————————————————————————————————————————————————————————
 
-# API_KEY    = "cfb54634-2a6b-471d-b7ac-4a5e07171fd9"
-# API_SECRET = "BAnHzC2jkGUlOYa4XcKe8w+pkziTLRjDIxX5e+GA0z4="
-# USERNAME   = "30949"
-# PASSWORD   = "Dnz3001*"
-
-API_KEY    = ""
-API_SECRET = ""
-USERNAME   = ""
-PASSWORD   = ""
+API_KEY    = "cfb54634-2a6b-471d-b7ac-4a5e07171fd9"
+API_SECRET = "BAnHzC2jkGUlOYa4XcKe8w+pkziTLRjDIxX5e+GA0z4="
+USERNAME   = "30949"
+PASSWORD   = "Dnz3001*"
 
 # ——————————————————————————————————————————————————————————————————————————————
 # CLI Menüleri için Enum → String Haritaları

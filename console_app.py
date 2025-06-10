@@ -170,6 +170,30 @@ def ask_optional_date(prompt: str) -> Optional[str]:
         except ValueError:
             print("❌ Geçersiz tarih formatı. YYYY-MM-DD biçiminde giriniz.")
 
+def ask_enum_choice(prompt: str, mapping: dict[int, str]) -> Optional[str]:
+    """Ask the user to choose one of the enum values.
+
+    Parameters
+    ----------
+    prompt: str
+        Text to show the user.
+    mapping: dict[int, str]
+        Maps menu numbers to enum strings.
+
+    Returns
+    -------
+    Optional[str]
+        Selected enum value or ``None`` if the user pressed Enter.
+    """
+    options = " ".join(f"{k}={v}" for k, v in mapping.items())
+    while True:
+        val = input(f"{prompt} ({options}, boş için Enter): ").strip()
+        if val == "":
+            return None
+        if val.isdigit() and int(val) in mapping:
+            return mapping[int(val)]
+        print("❌ Geçersiz seçim. Tekrar deneyin.")
+
 # ——— Portfolio Endpoints ———
 
 # Portfolio Endpoints
@@ -180,24 +204,36 @@ def get_subaccounts():
 
 def get_account_summary():
     port = ask_optional_int("Portfolio Number")
+    if port is None:
+        print("❌ Portfolio Number gerekli.")
+        return
     if api:
         resp = api.get_account_summary(portfolio_number=port)
         print(resp)
 
 def get_cash_assets():
     port = ask_optional_int("Portfolio Number")
+    if port is None:
+        print("❌ Portfolio Number gerekli.")
+        return
     if api:
         resp = api.get_cash_assets(portfolio_number=port)
         print(resp)
 
 def get_cash_balance():
     port = ask_optional_int("Portfolio Number")
+    if port is None:
+        print("❌ Portfolio Number gerekli.")
+        return
     if api:
         resp = api.get_cash_balance(portfolio_number=port)
         print(resp)
 
 def get_account_overall():
     port = ask_optional_int("Portfolio Number")
+    if port is None:
+        print("❌ Portfolio Number gerekli.")
+        return
     if api:
         resp = api.get_account_overall(portfolio_number=port)
         print(resp)
@@ -214,16 +250,20 @@ def get_stock_create_order():
     duration  = ask_enum_choice("Order Duration", ORDER_DURATION_MAP)
     mra       = ask_optional_bool("Market Risk Approval?")
 
+    if None in (port, symbol, qty, direction, price, method, duration, mra):
+        print("❌ Tüm alanlar zorunludur.")
+        return
+
     if api:
         resp = api.get_stock_create_order(
-            portfolio_number=port,
-            equity_code=symbol,
-            quantity=qty,
-            direction=direction,
-            price=price,
-            order_method=method,
-            order_duration=duration,
-            market_risk_approval=mra
+            portfolio_number=cast(int, port),
+            equity_code=cast(str, symbol),
+            quantity=cast(int, qty),
+            direction=cast(str, direction),
+            price=cast(float, price),
+            order_method=cast(str, method),
+            order_duration=cast(str, duration),
+            market_risk_approval=cast(bool, mra)
         )
         print("Response:", resp)
 
@@ -233,22 +273,29 @@ def get_stock_replace_order():
     price = ask_optional_int("New Price")
     qty   = ask_optional_int("New Quantity")
 
+    if None in (port, ref, price, qty):
+        print("❌ Tüm alanlar zorunludur.")
+        return
+
     if api:
         resp = api.get_stock_replace_order(
-            portfolio_number=port,
-            order_ref=ref,
-            price=price,
-            quantity=qty
+            portfolio_number=cast(int, port),
+            order_ref=cast(str, ref),
+            price=cast(int, price),
+            quantity=cast(int, qty)
         )
         print("Response:", resp)
 
 def get_stock_delete_order():
     port = ask_optional_int("Portfolio Number")
     ref  = ask_optional_str("Order Ref to delete")
+    if port is None or ref is None:
+        print("❌ Tüm alanlar zorunludur.")
+        return
     if api:
         resp = api.get_stock_delete_order(
-            portfolio_number=port,
-            order_ref=ref
+            portfolio_number=cast(int, port),
+            order_ref=cast(str, ref)
         )
         print("Response:", resp)
 
@@ -264,17 +311,31 @@ def get_stock_order_list():
     page_number      = ask_optional_int("Page Number")
     descending_order = ask_optional_bool("Descending Order?")
 
+    if None in (
+        port,
+        order_status,
+        order_direction,
+        order_method,
+        order_duration,
+        equity_code,
+        equity_type,
+        page_number,
+        descending_order,
+    ):
+        print("❌ Tüm alanlar zorunludur.")
+        return
+
     if api:
         resp = api.get_stock_order_list(
-            portfolio_number=port,
-            order_status=order_status,
-            order_direction=order_direction,
-            order_method=order_method,
-            order_duration=order_duration,
-            equity_code=equity_code,
-            equity_type=equity_type,
-            page_number=page_number,
-            descending_order=descending_order
+            portfolio_number=cast(int, port),
+            order_status=cast(int, order_status),
+            order_direction=cast(int, order_direction),
+            order_method=cast(int, order_method),
+            order_duration=cast(int, order_duration),
+            equity_code=cast(str, equity_code),
+            equity_type=cast(int, equity_type),
+            page_number=cast(int, page_number),
+            descending_order=cast(bool, descending_order),
         )
         print("Response:", resp)
 
@@ -285,13 +346,16 @@ def get_stock_positions():
     without_dep  = ask_optional_bool("Without Depot?")
     without_t1   = ask_optional_bool("Without T+1 Qty?")
 
+    if None in (port, equity_code, equity_type, without_dep, without_t1):
+        print("❌ Tüm alanlar zorunludur.")
+        return
     if api:
         resp = api.get_stock_positions(
-            portfolio_number=port,
-            equity_code=equity_code,
-            equity_type=equity_type,
-            without_depot=without_dep,
-            without_t1_qty=without_t1
+            portfolio_number=cast(int, port),
+            equity_code=cast(str, equity_code),
+            equity_type=cast(int, equity_type),
+            without_depot=cast(bool, without_dep),
+            without_t1_qty=cast(bool, without_t1)
         )
         print("Response:", resp)
 
@@ -307,17 +371,21 @@ def get_future_create_order():
     ahs       = ask_optional_bool("After Hour Valid?")
     exp_date  = ask_optional_date("Expiration Date")
 
+    if None in (port, contract, direction, price, qty, method, duration, ahs, exp_date):
+        print("❌ Tüm alanlar zorunludur.")
+        return
+
     if api:
         resp = api.get_future_create_order(
-            portfolio_number=port,
-            contract_code=contract,
-            direction=direction,
-            price=price,
-            quantity=qty,
-            order_method=method,
-            order_duration=duration,
-            after_hour_session_valid=ahs,
-            expiration_date=exp_date
+            portfolio_number=cast(int, port),
+            contract_code=cast(str, contract),
+            direction=cast(int, direction),
+            price=cast(int, price),
+            quantity=cast(int, qty),
+            order_method=cast(int, method),
+            order_duration=cast(int, duration),
+            after_hour_session_valid=cast(bool, ahs),
+            expiration_date=cast(str, exp_date)
         )
         print("Response:", resp)
 
@@ -329,14 +397,18 @@ def get_future_replace_order():
     otype    = ask_optional_int("Order Type")
     exp_date = ask_optional_date("Expiration Date")
 
+    if None in (port, ref, qty, price, otype, exp_date):
+        print("❌ Tüm alanlar zorunludur.")
+        return
+
     if api:
         resp = api.get_future_replace_order(
-            portfolio_number=port,
-            order_ref=ref,
-            quantity=qty,
-            price=price,
-            order_type=otype,
-            expiration_date=exp_date
+            portfolio_number=cast(int, port),
+            order_ref=cast(str, ref),
+            quantity=cast(int, qty),
+            price=cast(int, price),
+            order_type=cast(int, otype),
+            expiration_date=cast(str, exp_date)
         )
         print("Response:", resp)
 
@@ -344,10 +416,13 @@ def get_future_delete_order():
     port = ask_optional_int("Portfolio Number")
     ref  = ask_optional_str("Order Ref to delete")
 
+    if port is None or ref is None:
+        print("❌ Tüm alanlar zorunludur.")
+        return
     if api:
         resp = api.get_future_delete_order(
-            portfolio_number=port,
-            order_ref=ref
+            portfolio_number=cast(int, port),
+            order_ref=cast(str, ref)
         )
         print("Response:", resp)
 
@@ -363,25 +438,43 @@ def get_future_order_list():
     cancelled_orders          = ask_optional_bool("Cancelled Orders?")
     after_hour_session_valid  = ask_optional_bool("After Hour Session Valid?")
 
+    if None in (
+        port,
+        order_validity_date,
+        contract_code,
+        contract_type,
+        long_short,
+        pending_orders,
+        untransmitted_orders,
+        partially_executed_orders,
+        cancelled_orders,
+        after_hour_session_valid,
+    ):
+        print("❌ Tüm alanlar zorunludur.")
+        return
+
     if api:
         resp = api.get_future_order_list(
-            portfolio_number=port,
-            order_validity_date=order_validity_date,
-            contract_code=contract_code,
-            contract_type=contract_type,
-            long_short=long_short,
-            pending_orders=pending_orders,
-            untransmitted_orders=untransmitted_orders,
-            partially_executed_orders=partially_executed_orders,
-            cancelled_orders=cancelled_orders,
-            after_hour_session_valid=after_hour_session_valid
+            portfolio_number=cast(int, port),
+            order_validity_date=cast(str, order_validity_date),
+            contract_code=cast(str, contract_code),
+            contract_type=cast(int, contract_type),
+            long_short=cast(int, long_short),
+            pending_orders=cast(bool, pending_orders),
+            untransmitted_orders=cast(bool, untransmitted_orders),
+            partially_executed_orders=cast(bool, partially_executed_orders),
+            cancelled_orders=cast(bool, cancelled_orders),
+            after_hour_session_valid=cast(bool, after_hour_session_valid)
         )
         print("Response:", resp)
 
 def get_future_positions():
     port = ask_optional_int("Portfolio Number")
+    if port is None:
+        print("❌ Portfolio Number gerekli.")
+        return
     if api:
-        resp = api.get_future_positions(portfolio_number=port)
+        resp = api.get_future_positions(portfolio_number=cast(int, port))
         print("Response:", resp)
  
 def main():

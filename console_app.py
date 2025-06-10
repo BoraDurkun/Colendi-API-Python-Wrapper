@@ -1,13 +1,14 @@
 import os
 import sys
-from dotenv import load_dotenv, find_dotenv
-from api_client import API, WebSocket
-from typing import Optional
+from typing import Optional, cast
 from datetime import datetime
-import sys
+from dotenv import load_dotenv, find_dotenv
 from requests.exceptions import RequestException
 
-# ——— Ortam değişkenlerini yükle ———
+from api_client import API, WebSocket
+from enums import *
+
+# Ortam değişkenlerini yükle
 load_dotenv(find_dotenv())
 
 API_URL    = os.getenv("API_URL")
@@ -31,7 +32,6 @@ def main_menu():
         print(" '1' Portfolio Endpoints Menüsü")
         print(" '2' Stock Endpoints Menüsü")
         print(" '3' Future Endpoints Menüsü")
-
         print(" '*' Çıkış")
         secim = input("\nSeçiminiz: ").strip()
 
@@ -75,7 +75,7 @@ def portfolio_menu():
 
 def stock_menu():
     while True:
-        print("\nEmir Menüsü — Lütfen yapmak istediğiniz işlemi seçin:")
+        print("\nPay Emir Menüsü:")
         print(" '1' Emir Gönder")
         print(" '2' Emir Düzelt")
         print(" '3' Emir Sil")
@@ -101,12 +101,12 @@ def stock_menu():
 
 def future_menu():
     while True:
-        print("\nEmir Menüsü — Lütfen yapmak istediğiniz işlemi seçin:")
-        print(" '1' Future Emir Gönder")
-        print(" '2' Future Emir Düzelt")
-        print(" '3' Future Emir Sil (Stock)")
-        print(" '4' Future Emir Listesi")
-        print(" '5' Future pozisyonları")
+        print("\nVadeli Emir Menüsü:")
+        print(" '1' Emir Gönder")
+        print(" '2' Emir Düzelt")
+        print(" '3' Emir Sil")
+        print(" '4' Vadeli Emir Listesi")
+        print(" '5' Pozisyonlar")
         print(" '0' Ana Menü")
         secim = input("\nSeçiminiz: ").strip()
 
@@ -125,8 +125,6 @@ def future_menu():
         else:
             print("Geçersiz seçim. Tekrar deneyin.")
 
-# ——— Optional-input helper’ları ———
-
 def ask_optional_str(prompt: str) -> Optional[str]:
     val = input(f"{prompt} (boş için Enter): ").strip()
     return val or None
@@ -140,57 +138,69 @@ def ask_optional_int(prompt: str) -> Optional[int]:
             return int(val)
         print("❌ Geçersiz girdi. Lütfen bir sayı girin veya boş bırakın.")
 
+def ask_optional_float(prompt: str) -> Optional[float]:
+    while True:
+        val = input(f"{prompt} (boş için Enter): ").strip().replace(",", ".")
+        if val == "":
+            return None
+        try:
+            return float(val)
+        except ValueError:
+            print("❌ Geçersiz sayı. Lütfen bir ondalıklı değer girin veya boş bırakın.")
+
 def ask_optional_bool(prompt: str) -> Optional[bool]:
     while True:
         val = input(f"{prompt} (1=Evet, 0=Hayır, boş için Enter): ").strip().lower()
         if val == "":
             return None
-        if val in ("1",):
+        if val in ("1", "y", "e", "yes", "true", "t"):
             return True
-        if val in ("0",):
+        if val in ("0", "n", "h", "no", "false", "f"):
             return False
-        if val in ("y", "e", "yes", "true", "t"):
-            return True
-        if val in ("n", "h", "no", "false", "f"):
-            return False
-        print("❌ Geçersiz girdi. Lütfen 1/0, y/n ya da boş girin.")
+        print("❌ Geçersiz girdi. Lütfen 1/0 veya evet/hayır yazın.")
 
 def ask_optional_date(prompt: str) -> Optional[str]:
     while True:
-        val = input(f"{prompt} (YYYY-MM-DD veya boş için Enter): ").strip()
+        val = input(f"{prompt} (YYYY-MM-DD, boş için Enter): ").strip()
         if val == "":
             return None
         try:
             datetime.strptime(val, "%Y-%m-%d")
             return val
         except ValueError:
-            print("❌ Geçersiz tarih. Lütfen YYYY-MM-DD formatında ya da boş bırakın.")
+            print("❌ Geçersiz tarih formatı. YYYY-MM-DD biçiminde giriniz.")
 
 # ——— Portfolio Endpoints ———
 
+# Portfolio Endpoints
 def get_subaccounts():
-    resp = api.get_subaccounts()
-    print(resp)
+    if api:
+        resp = api.get_subaccounts()
+        print(resp)
 
 def get_account_summary():
     port = ask_optional_int("Portfolio Number")
-    resp = api.get_account_summary(portfolio_number=port)
-    print(resp)
+    if api:
+        resp = api.get_account_summary(portfolio_number=port)
+        print(resp)
 
 def get_cash_assets():
     port = ask_optional_int("Portfolio Number")
-    resp = api.get_cash_assets(portfolio_number=port)
-    print(resp)
+    if api:
+        resp = api.get_cash_assets(portfolio_number=port)
+        print(resp)
 
 def get_cash_balance():
     port = ask_optional_int("Portfolio Number")
-    resp = api.get_cash_balance(portfolio_number=port)
-    print(resp)
+    if api:
+        resp = api.get_cash_balance(portfolio_number=port)
+        print(resp)
 
 def get_account_overall():
     port = ask_optional_int("Portfolio Number")
-    resp = api.get_account_overall(portfolio_number=port)
-    print(resp)
+    if api:
+        resp = api.get_account_overall(portfolio_number=port)
+        print(resp)
 
 # ——— Stock Endpoints ———
 # HATA Alıyor
@@ -198,44 +208,49 @@ def get_stock_create_order():
     port      = ask_optional_int("Portfolio Number")
     symbol    = ask_optional_str("Equity Code")
     qty       = ask_optional_int("Quantity")
-    direction = ask_optional_int("Direction (1=Buy, 2=Sell)")
-    price     = ask_optional_int("Price")
-    method    = ask_optional_int("Order Method")
-    duration  = ask_optional_int("Order Duration")
+    direction = ask_enum_choice("Direction", DIRECTION_MAP)
+    price     = ask_optional_float("Price")
+    method    = ask_enum_choice("Order Method", ORDER_METHOD_MAP)
+    duration  = ask_enum_choice("Order Duration", ORDER_DURATION_MAP)
     mra       = ask_optional_bool("Market Risk Approval?")
-    resp = api.get_stock_create_order(
-        portfolio_number=port,
-        equity_code=symbol,
-        quantity=qty,
-        direction=direction,
-        price=price,
-        order_method=method,
-        order_duration=duration,
-        market_risk_approval=mra
-    )
-    print("Response:", resp)
+
+    if api:
+        resp = api.get_stock_create_order(
+            portfolio_number=port,
+            equity_code=symbol,
+            quantity=qty,
+            direction=direction,
+            price=price,
+            order_method=method,
+            order_duration=duration,
+            market_risk_approval=mra
+        )
+        print("Response:", resp)
 
 def get_stock_replace_order():
     port  = ask_optional_int("Portfolio Number")
     ref   = ask_optional_str("Order Ref")
     price = ask_optional_int("New Price")
     qty   = ask_optional_int("New Quantity")
-    resp = api.get_stock_replace_order(
-        portfolio_number=port,
-        order_ref=ref,
-        price=price,
-        quantity=qty
-    )
-    print("Response:", resp)
+
+    if api:
+        resp = api.get_stock_replace_order(
+            portfolio_number=port,
+            order_ref=ref,
+            price=price,
+            quantity=qty
+        )
+        print("Response:", resp)
 
 def get_stock_delete_order():
     port = ask_optional_int("Portfolio Number")
     ref  = ask_optional_str("Order Ref to delete")
-    resp = api.get_stock_delete_order(
-        portfolio_number=port,
-        order_ref=ref
-    )
-    print("Response:", resp)
+    if api:
+        resp = api.get_stock_delete_order(
+            portfolio_number=port,
+            order_ref=ref
+        )
+        print("Response:", resp)
 
 # HATA Alıyor
 def get_stock_order_list():
@@ -248,70 +263,39 @@ def get_stock_order_list():
     equity_type      = ask_optional_int("Equity Type")
     page_number      = ask_optional_int("Page Number")
     descending_order = ask_optional_bool("Descending Order?")
-    resp = api.get_stock_order_list(
-        portfolio_number=port,
-        order_status=order_status,
-        order_direction=order_direction,
-        order_method=order_method,
-        order_duration=order_duration,
-        equity_code=equity_code,
-        equity_type=equity_type,
-        page_number=page_number,
-        descending_order=descending_order
-    )
-    print("Response:", resp)
+
+    if api:
+        resp = api.get_stock_order_list(
+            portfolio_number=port,
+            order_status=order_status,
+            order_direction=order_direction,
+            order_method=order_method,
+            order_duration=order_duration,
+            equity_code=equity_code,
+            equity_type=equity_type,
+            page_number=page_number,
+            descending_order=descending_order
+        )
+        print("Response:", resp)
 
 def get_stock_positions():
-    # 1) Portfolio Number
-    while True:
-        port_str = input("Portfolio Number: ").strip()
-        if port_str.isdigit():
-            port = int(port_str)
-            break
-        print("❌ Geçersiz sayı. Lütfen sadece rakam girin.")
+    port         = ask_optional_int("Portfolio Number")
+    equity_code  = ask_optional_str("Equity Code")
+    equity_type  = ask_optional_int("Equity Type")
+    without_dep  = ask_optional_bool("Without Depot?")
+    without_t1   = ask_optional_bool("Without T+1 Qty?")
 
-    # 2) Equity Code (isterseniz boş da bırakabilirsiniz)
-    eq_code_input = input("Equity Code (boş bırakmak için Enter): ").strip()
-    equity_code: Optional[str] = eq_code_input or None
-
-    # 3) Equity Type (sayısal veya boş)
-    while True:
-        eq_type_str = input("Equity Type (sayısal veya boş): ").strip()
-        if eq_type_str == "":
-            equity_type = None
-            break
-        if eq_type_str.isdigit():
-            equity_type = int(eq_type_str)
-            break
-        print("❌ Geçersiz girdi. Lütfen bir sayı girin veya boş bırakın.")
-
-    # 4) Boolean değerleri 1/0 veya y/n ile alalım
-    def ask_bool(prompt: str) -> bool:
-        while True:
-            val = input(prompt + " (1=Evet, 0=Hayır): ").strip().lower()
-            if val in ("1", "0"):
-                return val == "1"
-            if val in ("y", "e", "yes", "true", "t"):
-                return True
-            if val in ("n", "h", "no", "false", "f"):
-                return False
-            print("❌ Geçersiz girdi. Lütfen 1 veya 0 girin.")
-
-    without_depot   = ask_bool("without_depot")
-    without_t1_qty  = ask_bool("without_t1_qty")
-
-    # 5) Çağrıyı yapıp sonucu yazdıralım
-    resp = api.get_stock_positions(
-        portfolio_number=port,
-        equity_code=equity_code,
-        equity_type=equity_type,
-        without_depot=without_depot,
-        without_t1_qty=without_t1_qty,
-    )
-    print("Response:", resp)
+    if api:
+        resp = api.get_stock_positions(
+            portfolio_number=port,
+            equity_code=equity_code,
+            equity_type=equity_type,
+            without_depot=without_dep,
+            without_t1_qty=without_t1
+        )
+        print("Response:", resp)
 
 # ——— Future Endpoints ———
-# HATA Alıyor
 def get_future_create_order():
     port      = ask_optional_int("Portfolio Number")
     contract  = ask_optional_str("Contract Code")
@@ -322,20 +306,21 @@ def get_future_create_order():
     duration  = ask_optional_int("Order Duration")
     ahs       = ask_optional_bool("After Hour Valid?")
     exp_date  = ask_optional_date("Expiration Date")
-    resp = api.get_future_create_order(
-        portfolio_number=port,
-        contract_code=contract,
-        direction=direction,
-        price=price,
-        quantity=qty,
-        order_method=method,
-        order_duration=duration,
-        after_hour_session_valid=ahs,
-        expiration_date=exp_date
-    )
-    print("Response:", resp)
 
-# HATA Alıyor
+    if api:
+        resp = api.get_future_create_order(
+            portfolio_number=port,
+            contract_code=contract,
+            direction=direction,
+            price=price,
+            quantity=qty,
+            order_method=method,
+            order_duration=duration,
+            after_hour_session_valid=ahs,
+            expiration_date=exp_date
+        )
+        print("Response:", resp)
+
 def get_future_replace_order():
     port     = ask_optional_int("Portfolio Number")
     ref      = ask_optional_str("Order Ref")
@@ -343,27 +328,29 @@ def get_future_replace_order():
     price    = ask_optional_int("New Price")
     otype    = ask_optional_int("Order Type")
     exp_date = ask_optional_date("Expiration Date")
-    resp = api.get_future_replace_order(
-        portfolio_number=port,
-        order_ref=ref,
-        quantity=qty,
-        price=price,
-        order_type=otype,
-        expiration_date=exp_date
-    )
-    print("Response:", resp)
 
-# HATA Alıyor
+    if api:
+        resp = api.get_future_replace_order(
+            portfolio_number=port,
+            order_ref=ref,
+            quantity=qty,
+            price=price,
+            order_type=otype,
+            expiration_date=exp_date
+        )
+        print("Response:", resp)
+
 def get_future_delete_order():
     port = ask_optional_int("Portfolio Number")
     ref  = ask_optional_str("Order Ref to delete")
-    resp = api.get_future_delete_order(
-        portfolio_number=port,
-        order_ref=ref
-    )
-    print("Response:", resp)
 
-# HATA Alıyor
+    if api:
+        resp = api.get_future_delete_order(
+            portfolio_number=port,
+            order_ref=ref
+        )
+        print("Response:", resp)
+
 def get_future_order_list():
     port                      = ask_optional_int("Portfolio Number")
     order_validity_date       = ask_optional_date("Order Validity Date")
@@ -375,42 +362,56 @@ def get_future_order_list():
     partially_executed_orders = ask_optional_bool("Partially Executed Orders?")
     cancelled_orders          = ask_optional_bool("Cancelled Orders?")
     after_hour_session_valid  = ask_optional_bool("After Hour Session Valid?")
-    resp = api.get_future_order_list(
-        portfolio_number=port,
-        order_validity_date=order_validity_date,
-        contract_code=contract_code,
-        contract_type=contract_type,
-        long_short=long_short,
-        pending_orders=pending_orders,
-        untransmitted_orders=untransmitted_orders,
-        partially_executed_orders=partially_executed_orders,
-        cancelled_orders=cancelled_orders,
-        after_hour_session_valid=after_hour_session_valid
-    )
-    print("Response:", resp)
+
+    if api:
+        resp = api.get_future_order_list(
+            portfolio_number=port,
+            order_validity_date=order_validity_date,
+            contract_code=contract_code,
+            contract_type=contract_type,
+            long_short=long_short,
+            pending_orders=pending_orders,
+            untransmitted_orders=untransmitted_orders,
+            partially_executed_orders=partially_executed_orders,
+            cancelled_orders=cancelled_orders,
+            after_hour_session_valid=after_hour_session_valid
+        )
+        print("Response:", resp)
 
 def get_future_positions():
     port = ask_optional_int("Portfolio Number")
-    resp = api.get_future_positions(portfolio_number=port)
-    print("Response:", resp)
-
-    
+    if api:
+        resp = api.get_future_positions(portfolio_number=port)
+        print("Response:", resp)
+ 
 def main():
-    # API nesnesini oluştur
     global api
-    api = API.get_api(
-        api_url    = API_URL,
-        api_key    = API_KEY,
-        secret_key = API_SECRET,
-        verbose    = True
-    )
+    if not all([API_URL, API_KEY, API_SECRET]):
+        print("❌ .env dosyasındaki API_URL, API_KEY veya API_SECRET eksik.")
+        sys.exit(1)
 
-    # Eğer kaydedilmiş geçerli bir token yoksa, OTP+login ile al
+    # Pylance için kesin tip belirtimi:
+    api_url: str = cast(str, API_URL)
+    api_key: str = cast(str, API_KEY)
+    secret_key: str = cast(str, API_SECRET)
+
+    try:
+        api = API.get_api(
+            api_url=api_url,
+            api_key=api_key,
+            secret_key=secret_key,
+            verbose=True
+        )
+
+    except Exception as e:
+        print("❌ API başlatılamadı:", e)
+        sys.exit(1)
+
     if not api._jwt_token:
         try:
-            otp_resp = api.send_otp(USERNAME, PASSWORD)
+            otp_resp = api.send_otp(USERNAME or "", PASSWORD or "")
         except RequestException as e:
-            print("❌ OTP isteği sırasında HTTP hatası:", e)
+            print("❌ OTP isteği sırasında hata:", e)
             sys.exit()
 
         data = otp_resp.get("data")
@@ -420,22 +421,21 @@ def main():
 
         token = data["token"]
         print("✅ OTP gönderildi.\n")
-
         code = input("SMS kodunu girin: ").strip()
+
         try:
             login_resp = api.login(token, code)
         except RequestException as e:
-            print("❌ Login sırasında HTTP hatası:", e)
+            print("❌ Giriş sırasında hata:", e)
             sys.exit(1)
 
         if not isinstance(login_resp, dict) or "data" not in login_resp:
             print("❌ Beklenmeyen login yanıtı:", login_resp)
             sys.exit(1)
 
-        print("✅Login başarılı")
+        print("✅ Giriş başarılı.")
     else:
-        # Zaten token varsa, doğrudan menüye geçebiliriz
-        print("✅🔑 Kayıtlı token hala geçerli, direkt menüye geçiliyor.")
+        print("✅🔑 Kayıtlı token geçerli. Menüye geçiliyor...")
 
     main_menu()
 

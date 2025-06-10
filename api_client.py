@@ -7,8 +7,6 @@ import json
 from typing import Any, Dict, Optional, Callable
 import requests
 
-from cert_handler import ensure_cert_in_env, cleanup_cert_from_env
-
 import asyncio
 from websockets.client import WebSocketClientProtocol # type: ignore
 import websockets
@@ -183,7 +181,6 @@ class API:
         `require_auth=False` ise JWT header eklenmez.
         """
         path     = endpoint if endpoint.startswith("/") else f"/{endpoint}"
-        cert_path = ensure_cert_in_env()
         ts       = self._timestamp()
         body_str = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         sig      = self._make_signature(path, body_str, ts)
@@ -201,8 +198,7 @@ class API:
         self._throttle()
         url = f"{self._api_url}{path}"
         resp = requests.post(url, data=body_str.encode("utf-8"),
-                             headers=headers, timeout=60, verify=cert_path)
-        cleanup_cert_from_env()
+                             headers=headers, timeout=60, verify=False)
         
         if self.verbose and resp.status_code == 200:
             logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
@@ -260,10 +256,10 @@ class API:
         portfolio_number: int,
         equity_code: str,
         quantity: int,
-        direction: int,
-        price: int,
-        order_method: int,
-        order_duration: int,
+        direction: str,
+        price: float,
+        order_method: str,
+        order_duration: str,
         market_risk_approval: bool
     ) -> Dict[str, Any]:
         payload = {

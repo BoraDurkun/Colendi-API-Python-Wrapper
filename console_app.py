@@ -169,6 +169,17 @@ def ask_optional_date(prompt: str) -> Optional[str]:
             return val
         except ValueError:
             print("❌ Geçersiz tarih formatı. YYYY-MM-DD biçiminde giriniz.")
+def ask_enum_choice(prompt: str, choice_map: dict[int, str]) -> str:
+    """Prompt user to select a value from a mapping."""
+    while True:
+        print(f"\n{prompt} seçenekleri:")
+        for key, val in choice_map.items():
+            print(f" {key}) {val}")
+        sel = input(f"{prompt} seçiminiz: ").strip()
+        if sel.isdigit() and int(sel) in choice_map:
+            return choice_map[int(sel)]
+        print("❌ Geçersiz seçim. Tekrar deneyin.")
+
 
 def ask_enum_choice(prompt: str, mapping: dict[int, str]) -> Optional[str]:
     """Ask the user to choose one of the enum values.
@@ -252,6 +263,9 @@ def get_stock_create_order():
 
     if None in (port, symbol, qty, direction, price, method, duration, mra):
         print("❌ Tüm alanlar zorunludur.")
+    if None in (port, symbol, qty, price, mra):
+        print("❌ Tüm alanlar doldurulmalı.")
+        main
         return
 
     if api:
@@ -275,6 +289,7 @@ def get_stock_replace_order():
 
     if None in (port, ref, price, qty):
         print("❌ Tüm alanlar zorunludur.")
+        print("❌ Tüm alanlar doldurulmalı.")
         return
 
     if api:
@@ -291,6 +306,8 @@ def get_stock_delete_order():
     ref  = ask_optional_str("Order Ref to delete")
     if port is None or ref is None:
         print("❌ Tüm alanlar zorunludur.")
+    if None in (port, ref):
+        print("❌ Tüm alanlar doldurulmalı.")
         return
     if api:
         resp = api.get_stock_delete_order(
@@ -323,6 +340,10 @@ def get_stock_order_list():
         descending_order,
     ):
         print("❌ Tüm alanlar zorunludur.")
+    if None in (port, order_status, order_direction, order_method,
+                order_duration, equity_code, equity_type, page_number,
+                descending_order):
+        print("❌ Tüm alanlar doldurulmalı.")
         return
 
     if api:
@@ -349,6 +370,9 @@ def get_stock_positions():
     if None in (port, equity_code, equity_type, without_dep, without_t1):
         print("❌ Tüm alanlar zorunludur.")
         return
+        print("❌ Tüm alanlar doldurulmalı.")
+        return
+
     if api:
         resp = api.get_stock_positions(
             portfolio_number=cast(int, port),
@@ -373,6 +397,7 @@ def get_future_create_order():
 
     if None in (port, contract, direction, price, qty, method, duration, ahs, exp_date):
         print("❌ Tüm alanlar zorunludur.")
+        print("❌ Tüm alanlar doldurulmalı.")
         return
 
     if api:
@@ -399,6 +424,7 @@ def get_future_replace_order():
 
     if None in (port, ref, qty, price, otype, exp_date):
         print("❌ Tüm alanlar zorunludur.")
+        print("❌ Tüm alanlar doldurulmalı.")
         return
 
     if api:
@@ -419,7 +445,11 @@ def get_future_delete_order():
     if port is None or ref is None:
         print("❌ Tüm alanlar zorunludur.")
         return
-    if api:
+    if None in (port, ref):
+        print("❌ Tüm alanlar doldurulmalı.")
+        return
+
+      if api:
         resp = api.get_future_delete_order(
             portfolio_number=cast(int, port),
             order_ref=cast(str, ref)
@@ -451,6 +481,8 @@ def get_future_order_list():
         after_hour_session_valid,
     ):
         print("❌ Tüm alanlar zorunludur.")
+
+        print("❌ Tüm alanlar doldurulmalı.")
         return
 
     if api:

@@ -5,9 +5,8 @@ import time
 import threading
 import asyncio
 
-from dotenv import load_dotenv, find_dotenv
 from api_client import API, WebSocket
-
+from config import *
 def start_ws_loop(ws: WebSocket):
     """
     Arka planda kendi WS instance'ımızı ayağa kaldıracak loop.
@@ -21,13 +20,6 @@ def start_ws_loop(ws: WebSocket):
 
 def main():
     # ——— 1) Ortamı yükle & REST login ———
-    load_dotenv(find_dotenv())
-    API_URL    = os.getenv("API_URL")
-    API_KEY    = os.getenv("API_KEY")
-    API_SECRET = os.getenv("API_SECRET")
-    USERNAME   = os.getenv("USERNAME")
-    PASSWORD   = os.getenv("PASSWORD")
-
     api = API.get_api(
         api_url    = API_URL,
         api_key    = API_KEY,

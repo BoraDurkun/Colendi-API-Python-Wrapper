@@ -2,16 +2,15 @@ import os
 import asyncio
 from dotenv import load_dotenv, find_dotenv
 from api_client import WebSocket
-
+from config import *
 def on_message(msg: str):
     print(f"[WS] {msg}")
 
 async def run_ws():
-    load_dotenv(find_dotenv())
 
-    api_url   = os.getenv("API_URL")
-    api_key   = os.getenv("API_KEY")
-    secret_key = os.getenv("API_SECRET")
+    api_url   = API_URL
+    api_key   = API_KEY
+    secret_key = API_SECRET
     jwt_token = os.getenv("JWT_TOKEN")
 
     # Ortam değişkenlerinin None olmamasını garanti altına al

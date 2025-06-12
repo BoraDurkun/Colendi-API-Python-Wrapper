@@ -1,185 +1,227 @@
-import os
 import sys
 from typing import Optional, cast
 from datetime import datetime
 from requests.exceptions import RequestException
-from rich import print_json
+
+import json
+from rich.console import Console
+from rich.theme import Theme
+from rich.syntax import Syntax
+from rich.panel import Panel
+from rich.text import Text
+from rich.prompt import Prompt
+from rich.table import Table
+
+theme = Theme({
+    "repr.string": "#E6DB74",
+    "repr.number": "#81A7FF",
+    "repr.bool_true": "#A6E22E",
+    "repr.bool_false": "#F92672",
+    "repr.none": "#75715E",
+    "repr.key": "bold #66D9EF",
+
+    "label": "bold #E6DB74",
+    "value": "italic #F8F8F2",
+
+    "info": "bold #66D9EF",
+    "warning": "italic #E69F00",
+    "error": "bold #FF5555",
+    "success": "bold #50FA7B",
+
+    "prompt": "bold #8BE9FD",
+    "menu": "#F8F8F2",
+    "title": "bold #81A7FF",
+    "highlight": "reverse #44475A",
+})
+
+console = Console(theme=theme)
 
 from api_client import API, WebSocket
 from config import *
 
-print(f"\n Api Url: {API_URL}")
-print(f"\n Api Key: {API_KEY}")
-print(f"\n Secret Key: {API_SECRET}")
-print(f"\n Müşteri No: {USERNAME}")
-print(f"\n Şifre: {PASSWORD}\n")
-
 # Global API istemcisi
 api: Optional[API] = None
 
-# ——— Menu Functions ———
-def main_menu():
-    while True:
-        print("\nAna Menüye hoş geldiniz. Lütfen yapmak istediğiniz işlemi seçin:")
-        print(" '1' Portfolio Endpoints Menüsü")
-        print(" '2' Stock Endpoints Menüsü")
-        print(" '3' Future Endpoints Menüsü")
-        print(" '*' Çıkış")
-        secim = input("\nSeçiminiz: ").strip()
+# ——— Pretty print functions ———
 
-        if secim == '1':
+def show_api_info():
+    table = Table.grid(padding=(0, 1))
+    table.add_column(style="label", justify="right")
+    table.add_column(style="value")
+    table.add_row("Api Url:", f"[highlight]{API_URL}[/]")
+    table.add_row("Api Key:", API_KEY)
+    table.add_row("Secret Key:", API_SECRET)
+    table.add_row("Müşteri No:", USERNAME or "-")
+    table.add_row("Şifre:", PASSWORD or "-")
+
+    console.print()
+    console.print(Panel(table, title="[title]Api Bilgileri[/title]", border_style="highlight", padding=(1, 2)))
+    console.print()
+
+
+def json_panel(data: dict | list, title: str = "JSON") -> None:
+    """
+    JSON verisini renklendirip panel içinde gösterir.
+    """
+    syntax = Syntax(
+        json.dumps(data, indent=2, ensure_ascii=False),
+        "json",
+        theme="monokai",
+        line_numbers=False,
+    )
+    console.print()
+    console.print(Panel(syntax, title=f"[title]{title}[/title]", border_style="highlight", padding=(1, 2)))
+    console.print()
+
+def select_from_menu(title: str, options: list[tuple[str, str]]) -> str:
+
+    lines = [f"[prompt]{key}[/prompt]  {desc}" for key, desc in options]
+    body = Text.from_markup("\n".join(lines))
+    panel = Panel(body, title=f"[title]{title}[/title]", border_style="highlight", expand=False)
+    console.print()
+    console.print(panel)
+    console.print()
+
+    return Prompt.ask("[prompt]Seçiminiz[/prompt]", default="").strip()
+
+# ── MENÜ FONKSİYONLARI ────────────────────────────────────────────────────────
+def main_menu() -> None:
+    while True:
+        choice = select_from_menu("Ana Menü", [
+            ("1", "Portfolio Endpoints Menüsü"),
+            ("2", "Stock Endpoints Menüsü"),
+            ("3", "Future Endpoints Menüsü"),
+            ("*", "Çıkış"),
+        ])
+        if choice == "1":
             portfolio_menu()
-        elif secim == '2':
+        elif choice == "2":
             stock_menu()
-        elif secim == '3':
+        elif choice == "3":
             future_menu()
-        elif secim == '*':
-            print("Çıkış yapılıyor…")
+        elif choice == "*":
+            console.print("[error]Çıkış yapılıyor…[/error]")
             sys.exit()
         else:
-            print("Geçersiz seçim. Tekrar deneyin.")
+            console.print("[warning]Geçersiz seçim.[/warning]")
 
-def portfolio_menu():
+def portfolio_menu() -> None:
     while True:
-        print("\nHesap Bilgisi Menüsü — Lütfen yapmak istediğiniz işlemi seçin:")
-        print(" '1' Alt Hesapları Görüntüle")
-        print(" '2' get_account_summary Bilgisi")
-        print(" '3' get_cash_assets Bilgisi")
-        print(" '4' get_cash_balance Bilgisi")
-        print(" '5' get_account_overall Bilgisi")
-        print(" '0' Ana Menü")
-        secim = input("\nSeçiminiz: ").strip()
+        choice = select_from_menu("Hesap Bilgisi Menüsü", [
+            ("1", "Alt Hesapları Görüntüle"),
+            ("2", "get_account_summary Bilgisi"),
+            ("3", "get_cash_assets Bilgisi"),
+            ("4", "get_cash_balance Bilgisi"),
+            ("5", "get_account_overall Bilgisi"),
+            ("0", "Ana Menü"),
+        ])
+        if choice == "0": return
+        elif choice == "1": get_subaccounts()
+        elif choice == "2": get_account_summary()
+        elif choice == "3": get_cash_assets()
+        elif choice == "4": get_cash_balance()
+        elif choice == "5": get_account_overall()
+        else: console.print("[warning]Geçersiz seçim.[/warning]")
 
-        if secim == '1':
-            get_subaccounts()
-        elif secim == '2':
-            get_account_summary()
-        elif secim == '3':
-            get_cash_assets()
-        elif secim == '4':
-            get_cash_balance()
-        elif secim == '5':
-            get_account_overall()
-        elif secim == '0':
-            return
-        else:
-            print("Geçersiz seçim. Tekrar deneyin.")
-
-def stock_menu():
+def stock_menu() -> None:
     while True:
-        print("\nPay Emir Menüsü:")
-        print(" '1' Emir Gönder")
-        print(" '2' Emir Düzelt")
-        print(" '3' Emir Sil")
-        print(" '4' Pay Emir Listesi")
-        print(" '5' Hisse Senedi Pozisyonları")
-        print(" '0' Ana Menü")
-        secim = input("\nSeçiminiz: ").strip()
+        choice = select_from_menu("Pay Emir Menüsü", [
+            ("1", "Emir Gönder"),
+            ("2", "Emir Düzelt"),
+            ("3", "Emir Sil"),
+            ("4", "Pay Emir Listesi"),
+            ("5", "Hisse Senedi Pozisyonları"),
+            ("0", "Ana Menü"),
+        ])
+        if choice == "0": return
+        elif choice == "1": get_stock_create_order()
+        elif choice == "2": get_stock_replace_order()
+        elif choice == "3": get_stock_delete_order()
+        elif choice == "4": get_stock_order_list()
+        elif choice == "5": get_stock_positions()
+        else: console.print("[warning]Geçersiz seçim.[/warning]")
 
-        if secim == '1':
-            get_stock_create_order()
-        elif secim == '2':
-            get_stock_replace_order()
-        elif secim == '3':
-            get_stock_delete_order()
-        elif secim == '4':
-            get_stock_order_list()
-        elif secim == '5':
-            get_stock_positions()
-        elif secim == '0':
-            return
-        else:
-            print("Geçersiz seçim. Tekrar deneyin.")
-
-def future_menu():
+def future_menu() -> None:
     while True:
-        print("\nVadeli Emir Menüsü:")
-        print(" '1' Emir Gönder")
-        print(" '2' Emir Düzelt")
-        print(" '3' Emir Sil")
-        print(" '4' Vadeli Emir Listesi")
-        print(" '5' Pozisyonlar")
-        print(" '0' Ana Menü")
-        secim = input("\nSeçiminiz: ").strip()
-
-        if secim == '1':
-            get_future_create_order()
-        elif secim == '2':
-            get_future_replace_order()
-        elif secim == '3':
-            get_future_delete_order()
-        elif secim == '4':
-            get_future_order_list()
-        elif secim == '5':
-            get_future_positions()
-        elif secim == '0':
-            return
-        else:
-            print("Geçersiz seçim. Tekrar deneyin.")
+        choice = select_from_menu("Vadeli Emir Menüsü", [
+            ("1", "Emir Gönder"),
+            ("2", "Emir Düzelt"),
+            ("3", "Emir Sil"),
+            ("4", "Vadeli Emir Listesi"),
+            ("5", "Pozisyonlar"),
+            ("0", "Ana Menü"),
+        ])
+        if choice == "0": return
+        elif choice == "1": get_future_create_order()
+        elif choice == "2": get_future_replace_order()
+        elif choice == "3": get_future_delete_order()
+        elif choice == "4": get_future_order_list()
+        elif choice == "5": get_future_positions()
+        else: console.print("[warning]Geçersiz seçim.[/warning]")
 
 # ——— Choice Functions ———
 def ask_optional_str(prompt: str, required: bool = False) -> Optional[str]:
     while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(boş için Enter)'} : ").strip()
+        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} : ").strip()
         if val == "":
             if required:
-                print("❌ Bu alan zorunlu, lütfen bir değer girin.")
+                console.print("❌ Bu alan zorunlu, lutfen bir deger girin.")
                 continue
             return None
         return val
 
 def ask_optional_int(prompt: str, required: bool = False) -> Optional[int]:
     while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(boş için Enter)'} : ").strip()
+        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} : ").strip()
         if val == "":
             if required:
-                print("❌ Bu alan zorunlu, lütfen bir sayı girin.")
+                console.print("❌ Bu alan zorunlu, lutfen bir sayi girin.")
                 continue
             return None
         if val.isdigit():
             return int(val)
-        print("❌ Geçersiz girdi. Lütfen bir sayı girin veya boş bırakın.")
+        console.print("❌ Gecersiz girdi. Lutfen bir sayi girin veya bos birakin.")
 
 def ask_optional_float(prompt: str, required: bool = False) -> Optional[float]:
     while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(boş için Enter)'} : ").strip().replace(",", ".")
+        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} : ").strip().replace(",", ".")
         if val == "":
             if required:
-                print("❌ Bu alan zorunlu, lütfen bir ondalıklı sayı girin.")
+                console.print("❌ Bu alan zorunlu, lutfen bir ondalikli sayi girin.")
                 continue
             return None
         try:
             return float(val)
         except ValueError:
-            print("❌ Geçersiz sayı. Lütfen ondalıklı bir değer girin veya boş bırakın.")
+            console.print("❌ Gecersiz sayi. Lutfen ondalikli bir deger girin veya bos birakin.")
 
 def ask_optional_bool(prompt: str, required: bool = False) -> Optional[bool]:
     while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(boş için Enter)'} (1=Evet, 0=Hayır): ").strip().lower()
+        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} (1=Evet, 0=Hayir): ").strip().lower()
         if val == "":
             if required:
-                print("❌ Bu alan zorunlu, lütfen evet veya hayır girin.")
+                console.print("❌ Bu alan zorunlu, lutfen evet veya hayir girin.")
                 continue
             return None
         if val in ("1", "y", "e", "yes", "true", "t"):
             return True
         if val in ("0", "n", "h", "no", "false", "f"):
             return False
-        print("❌ Geçersiz girdi. Lütfen 1/0 veya evet/hayır yazın.")
+        console.print("❌ Gecersiz girdi. Lutfen 1/0 veya evet/hayir yazin.")
 
 def ask_optional_date(prompt: str, required: bool = False) -> Optional[str]:
     while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(boş için Enter)'} (YYYY-MM-DD): ").strip()
+        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} (YYYY-MM-DD): ").strip()
         if val == "":
             if required:
-                print("❌ Bu alan zorunlu, lütfen geçerli bir tarih girin.")
+                console.print("❌ Bu alan zorunlu, lutfen gecerli bir tarih girin.")
                 continue
             return None
         try:
             datetime.strptime(val, "%Y-%m-%d")
             return val
         except ValueError:
-            print("❌ Geçersiz tarih formatı. YYYY-MM-DD biçiminde giriniz.")
+            console.print("❌ Gecersiz tarih formati. YYYY-MM-DD biciminde giriniz.")
 
 def ask_enum_choice(
     prompt: str,
@@ -189,31 +231,31 @@ def ask_enum_choice(
     """
     :param prompt: Soru metni
     :param choice_map: {1: "A", 2: "B", ...}
-    :param required: True ise boş geçilmesine izin vermez
-    :return: Seçilen değer veya None
+    :param required: True ise bos gecilmesine izin vermez
+    :return: Secilen deger veya None
     """
     while True:
-        print(f"\n{prompt} seçenekleri:")
+        console.print(f"\n{prompt} secenekleri:")
         for key, val in choice_map.items():
-            print(f" {key}) {val}")
-        sel = input(f"{prompt} seçiminiz{' (zorunlu)' if required else '(boş için Enter)'}: ").strip()
+            console.print(f" {key}) {val}")
+        sel = input(f"{prompt} seciminiz{' (zorunlu)' if required else '(bos icin Enter)'}: ").strip()
         
         if sel == "":
             if required:
-                print("❌ Bu alan zorunlu, lütfen bir seçim yapın.")
+                console.print("❌ Bu alan zorunlu, lutfen bir secim yapin.")
                 continue
             return None
         
         if sel.isdigit() and int(sel) in choice_map:
             return choice_map[int(sel)]
         
-        print("❌ Geçersiz seçim. Tekrar deneyin.")
+        console.print("❌ Gecersiz secim. Tekrar deneyin.")
 
 # ——— Portfolio Endpoints ———
 def get_subaccounts():
     if api:
         resp = api.get_subaccounts()
-        print_json(data=resp)
+        json_panel(resp, title="Alt Hesaplar")
 
 def get_account_summary():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -222,7 +264,7 @@ def get_account_summary():
     assert port is not None
     if api:
         resp = api.get_account_summary(portfolio_number=port)
-        print_json(data=resp)
+        json_panel(resp, title="get_account_summary")
 
 def get_cash_assets():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -231,7 +273,7 @@ def get_cash_assets():
     assert port is not None
     if api:
         resp = api.get_cash_assets(portfolio_number=port)
-        print_json(data=resp)
+        json_panel(resp, title="get_cash_assets")
 
 def get_cash_balance():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -240,7 +282,7 @@ def get_cash_balance():
     assert port is not None
     if api:
         resp = api.get_cash_balance(portfolio_number=port)
-        print_json(data=resp)
+        json_panel(resp, title="get_cash_balance")
 
 def get_account_overall():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -249,7 +291,7 @@ def get_account_overall():
     assert port is not None
     if api:
         resp = api.get_account_overall(portfolio_number=port)
-        print_json(data=resp)
+        json_panel(resp, title="get_account_overall")
 
 # ——— Stock Endpoints ———
 def get_stock_create_order():
@@ -277,7 +319,7 @@ def get_stock_create_order():
             order_duration=duration,
             market_risk_approval=mra
         )
-        print_json(data=resp)
+        json_panel(resp, title="get_stock_create_order")
 
 def get_stock_replace_order():
     port  = ask_optional_int("Portfolio Number", required=True)
@@ -296,7 +338,7 @@ def get_stock_replace_order():
             price=price,
             quantity=qty
         )
-        print_json(data=resp)
+        json_panel(resp, title="get_stock_replace_order")
 
 def get_stock_delete_order():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -309,7 +351,7 @@ def get_stock_delete_order():
             portfolio_number=port,
             order_ref=ref
         )
-        print_json(data=resp)
+        json_panel(resp, title="get_stock_delete_order")
 
 def get_stock_order_list():
     port             = ask_optional_int("Portfolio Number", required=True)
@@ -323,7 +365,7 @@ def get_stock_order_list():
     descending_order = ask_optional_bool("Descending Order?")
 
     if (port is None or page_number is None):
-        print("❌ Zorumlu alanlar doldurulmalı.")
+        console.print("❌ Zorumlu alanlar doldurulmali.")
         return
     assert (port is not None and page_number is not None)
 
@@ -339,7 +381,7 @@ def get_stock_order_list():
             page_number=page_number,
             descending_order=descending_order
         )
-        print_json(data=resp)
+        json_panel(resp, title="get_stock_order_list")
 
 def get_stock_positions():
     port         = ask_optional_int("Portfolio Number", required=True)
@@ -349,7 +391,7 @@ def get_stock_positions():
     without_t1   = ask_optional_bool("Without T+1 Qty?")
 
     if (port is None):
-        print("❌ Zorunlu alanlar doldurulmalı.")
+        console.print("❌ Zorunlu alanlar doldurulmali.")
         return
     assert (port is not None)
 
@@ -361,7 +403,7 @@ def get_stock_positions():
             without_depot=without_dep,
             without_t1_qty=without_t1
         )
-        print_json(data=resp)
+        json_panel(resp, title="get_stock_positions")
 
 # ——— Future Endpoints ———
 def get_future_create_order():
@@ -395,7 +437,7 @@ def get_future_create_order():
             after_hour_session_valid=ahs,
             expiration_date=exp_date
         )
-        print_json(data=resp)
+        json_panel(resp, title="get_future_create_order")
 
 def get_future_replace_order():
     port     = ask_optional_int("Portfolio Number", required=True)
@@ -418,7 +460,7 @@ def get_future_replace_order():
             order_type=otype,
             expiration_date=exp_date
         )
-        print_json(data=resp)
+        json_panel(resp, title="get_future_replace_order")
 
 def get_future_delete_order():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -433,7 +475,7 @@ def get_future_delete_order():
             portfolio_number=port,
             order_ref=ref
         )
-        print_json(data=resp)
+        json_panel(resp, title="get_future_delete_order")
 
 def get_future_order_list():
     port                      = ask_optional_int("Portfolio Number", required=True)
@@ -468,7 +510,7 @@ def get_future_order_list():
             cancelled_orders=cancelled_orders,
             after_hour_session_valid=after_hour_session_valid
         )
-        print_json(data=resp)
+        json_panel(resp, title="get_future_order_list")
 
 def get_future_positions():
     port = ask_optional_int("Portfolio Number", required=True)
@@ -476,15 +518,15 @@ def get_future_positions():
         return
     if api:
         resp = api.get_future_positions(portfolio_number=port)
-        print_json(data=resp)
+        json_panel(resp, title="get_future_positions")
  
 def main():
     global api
     if not all([API_URL, API_KEY, API_SECRET]):
-        print("❌ config.py dosyasındaki API_URL, API_KEY veya API_SECRET eksik.")
+        console.print("❌ config.py dosyasindaki API_URL, API_KEY veya API_SECRET eksik.")
         sys.exit()
 
-    # Pylance için kesin tip belirtimi:
+    # Pylance icin kesin tip belirtimi:
     api_url: str = cast(str, API_URL)
     api_key: str = cast(str, API_KEY)
     secret_key: str = cast(str, API_SECRET)
@@ -498,40 +540,41 @@ def main():
         )
 
     except Exception as e:
-        print("❌ API başlatılamadı:", e)
+        console.print("❌ API baslatilamadi:", e)
         sys.exit()
 
     if not api._jwt_token:
         try:
             otp_resp = api.send_otp(USERNAME or "", PASSWORD or "")
         except RequestException as e:
-            print("❌ OTP isteği sırasında hata:", e)
+            console.print("❌ OTP istegi sirasinda hata:", e)
             sys.exit()
 
         data = otp_resp.get("data")
         if not isinstance(data, dict) or "token" not in data:
-            print("❌ OTP yanıtında token bulunamadı:", otp_resp)
+            console.print("❌ OTP yanitinda token bulunamadi:", otp_resp)
             sys.exit()
 
         token = data["token"]
-        print("✅ OTP gönderildi.\n")
+        console.print("✅ OTP gonderildi.\n")
         code = input("SMS kodunu girin: ").strip()
 
         try:
             login_resp = api.login(token, code)
         except RequestException as e:
-            print("❌ Giriş sırasında hata:", e)
+            console.print("❌ Giris sirasinda hata:", e)
             sys.exit()
 
         if not isinstance(login_resp, dict) or "data" not in login_resp:
-            print("❌ Beklenmeyen login yanıtı:", login_resp)
+            console.print("❌ Beklenmeyen login yaniti:", login_resp)
             sys.exit()
 
-        print("✅ Giriş başarılı.")
+        console.print("✅ Giris basarili.")
     else:
-        print("✅🔑 Kayıtlı token geçerli. Menüye geçiliyor...")
+        console.print("✅🔑 Kayitli token gecerli. Menuye geciliyor...")
 
     main_menu()
 
 if __name__ == "__main__":
+    show_api_info()
     main()

@@ -28,7 +28,7 @@ logger = logging.getLogger("api_client")
 
 class API:
     """
-    Singleton HMAC‐imzalı REST API istemcisi.
+    Singleton HMAC‐imzali REST API istemcisi.
     """
     TOKEN_FILE = "api_settings.json"
     _instance: Optional["API"] = None
@@ -44,7 +44,7 @@ class API:
         verbose: bool = True
     ) -> "API":
         """
-        Tekil API nesnesini döner. İlk çağrıda api_url, api_key, secret_key zorunludur.
+        Tekil API nesnesini doner. İlk cagrida api_url, api_key, secret_key zorunludur.
         """
         with cls._lock:
             if cls._instance is None:
@@ -69,27 +69,27 @@ class API:
         self._client_key  = api_key
         self._secret_key  = secret_key
         self._last_req = 0.0
-        self.interval = 1 # İstekler arasında kaç saniye olsun
+        self.interval = 1 # İstekler arasinda kac saniye olsun
         
 
-        # --- Token yükleme ve geçerlilik kontrolü (evvelden eklediğimiz) ---
+        # --- Token yukleme ve gecerlilik kontrolu (evvelden ekledigimiz) ---
         self._jwt_token = self._load_saved_token()
         if self._jwt_token:
             if self.verbose:
-                logger.info(f"✅ Yüklendi: {self.TOKEN_FILE}")
+                logger.info(f"✅ Yuklendi: {self.TOKEN_FILE}")
             resp = self.get_subaccounts()
             stat = resp.get("statusCode", "status")
             
             if stat == 200:
                 if self.verbose:
-                    logger.info("✅ Kaydedilmiş token geçerli.")
+                    logger.info("✅ Kaydedilmis token gecerli.")
             else:
                 if self.verbose:
-                    logger.warning(f"❌ Kaydedilmiş token geçersiz ({stat}), temizleniyor.")
+                    logger.warning(f"❌ Kaydedilmis token gecersiz ({stat}), temizleniyor.")
                 self._jwt_token = ""
                 self._clear_saved_token()
 
-        # --- AUTO SESSION REFRESH başlat ---
+        # --- AUTO SESSION REFRESH baslat ---
         self._start_session_refresher()
 
     # ————— HELPERS —————
@@ -97,7 +97,7 @@ class API:
     def _start_session_refresher(self):
         """
         Arka planda daemon thread ile her 60 saniyede bir
-        get_subaccounts() çağırıp session'ı yeniler.
+        get_subaccounts() cagirip session'i yeniler.
         """
         thread = threading.Thread(target=self._session_refresher_loop, daemon=True)
         thread.start()
@@ -106,7 +106,7 @@ class API:
         while True:
             time.sleep(60)
             if not self._jwt_token:
-                # Henüz login olunmadıysa atla
+                # Henuz login olunmadiysa atla
                 continue
             try:
                 self.get_subaccounts()
@@ -116,22 +116,22 @@ class API:
                 if self.verbose:
                     logger.warning(f"❌ Session refresh failed: {e}")
 
-    # ——— Token helper’ları ———
+    # ——— Token helper’lari ———
     @classmethod
     def _load_saved_token(cls) -> str:
-        # Dosya yoksa oluştur ve boş token döndür
+        # Dosya yoksa olustur ve bos token dondur
         if not os.path.isfile(cls.TOKEN_FILE):
             with open(cls.TOKEN_FILE, "w", encoding="utf-8") as f:
                 json.dump({"jwtToken": ""}, f, ensure_ascii=False)
             return ""
-        # Var olan dosyayı oku
+        # Var olan dosyayi oku
         try:
             with open(cls.TOKEN_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             return data.get("jwtToken", "")
         except Exception as e:
-            # Hata varsa dosyayı sıfırla
-            logger.warning(f"Hata oluştu: {e}. Token dosyası sıfırlanıyor.")
+            # Hata varsa dosyayi sifirla
+            logger.warning(f"Hata olustu: {e}. Token dosyasi sifirlaniyor.")
             with open(cls.TOKEN_FILE, "w", encoding="utf-8") as f:
                 json.dump({"jwtToken": ""}, f, ensure_ascii=False)
             return ""
@@ -180,7 +180,7 @@ class API:
         require_auth: bool = True
     ) -> Dict[str, Any]:
         """
-        Tüm POST istekleri bu metot üzerinden gider.
+        Tum POST istekleri bu metot uzerinden gider.
         `require_auth=False` ise JWT header eklenmez.
         """
         path     = endpoint if endpoint.startswith("/") else f"/{endpoint}"
@@ -214,7 +214,7 @@ class API:
     # ————— Authentication —————
     def send_otp(self, internet_user: str, password: str) -> Dict[str, Any]:
         """
-        OTP gönderir. require_auth=False ile JWT header eklenmez.
+        OTP gonderir. require_auth=False ile JWT header eklenmez.
         """
         return self._post("Identity/SendOtp",
                           {"internetUser": internet_user, "password": password},
@@ -222,7 +222,7 @@ class API:
 
     def login(self, token: str, otp: str) -> Dict[str, Any]:
         """
-        SMS koduyla login olur ve JWT token’ı kaydeder.
+        SMS koduyla login olur ve JWT token’i kaydeder.
         """
         resp = self._post("Identity/Login",
                           {"token": token, "otp": otp},
@@ -451,13 +451,13 @@ class API:
               
 class WebSocket:
     """
-    HMAC imzalı WebSocket bağlantısı sağlayan ve periyodik 'heartbeat' mesajı
-    atan bir istemci sınıfı.
+    HMAC imzali WebSocket baglantisi saglayan ve periyodik 'heartbeat' mesaji
+    atan bir istemci sinifi.
 
-    Özellikler:
-      - Bağlantı açıldığında otomatik reconnect.
-      - Belirlenen aralıkla ('heartbeat_interval') H tipi heartbeat gönderimi.
-      - Gelen mesajları istersen on_message callback’ine, istersen verbose modda console'a yazdırma.
+    ozellikler:
+      - Baglanti acildiginda otomatik reconnect.
+      - Belirlenen aralikla ('heartbeat_interval') H tipi heartbeat gonderimi.
+      - Gelen mesajlari istersen on_message callback’ine, istersen verbose modda console'a yazdirma.
     """
 
     def __init__(
@@ -471,14 +471,14 @@ class WebSocket:
     ):
         """
         Parametreler:
-          api_url           : REST API base URL (ör. "https://api.example.com")
-          api_key           : X-ClientKey başlığı için kullanılacak anahtar
-          secret_key        : İmzalama için HMAC secret
+          api_url           : REST API base URL (or. "https://api.example.com")
+          api_key           : X-ClientKey basligi icin kullanilacak anahtar
+          secret_key        : İmzalama icin HMAC secret
           jwt_token         : Yetkili JWT token (Bearer olmadan)
-          heartbeat_interval: Kaç saniyede bir heartbeat atılacağı
-          verbose           : True ise loglama açık olur
+          heartbeat_interval: Kac saniyede bir heartbeat atilacagi
+          verbose           : True ise loglama acik olur
         """
-        # HTTP → WebSocket URL dönüşümü (wss/ws)
+        # HTTP → WebSocket URL donusumu (wss/ws)
         self.ws_url = api_url.rstrip('/') \
             .replace('https://', 'wss://') \
             .replace('http://', 'ws://') + '/ws'
@@ -492,17 +492,17 @@ class WebSocket:
         # callback placeholder
         self.on_message: Optional[Callable[[str], None]] = None
 
-        # İç durum
+        # İc durum
         self._last_heartbeat = 0.0
         self._ws: Optional[WebSocketClientProtocol] = None
 
     def _timestamp(self) -> str:
-        """Şu anki Unix timestamp'ini saniye cinsinden string olarak döner."""
+        """su anki Unix timestamp'ini saniye cinsinden string olarak doner."""
         return str(int(time.time()))
 
     def _make_signature(self, path: str, body_str: str, timestamp: str) -> str:
         """
-        HMAC-SHA256 imzası oluşturur ve base64 ile kodlar.
+        HMAC-SHA256 imzasi olusturur ve base64 ile kodlar.
 
         İmza girdisi: "{client_key}|{path}|{body}|{timestamp}"
         """
@@ -516,8 +516,8 @@ class WebSocket:
 
     async def connect(self):
         """
-        WebSocket bağlantısını başlatır, header'ları ekler ve
-        alıcı/gönderici döngülerini tetikler.
+        WebSocket baglantisini baslatir, header'lari ekler ve
+        alici/gonderici dongulerini tetikler.
         """
         path = '/ws'
         ts = self._timestamp()
@@ -530,20 +530,20 @@ class WebSocket:
             'X-Timestamp': ts,
         }
 
-        # Bağlantıyı aç
+        # Baglantiyi ac
         self._ws = await websockets.connect(self.ws_url, additional_headers=headers)
         if self.verbose:
-            logger.info(f"✅ WebSocket bağlantısı kuruldu: {self.ws_url}")
-        # Gelen mesajları dinlemeye başla
+            logger.info(f"✅ WebSocket baglantisi kuruldu: {self.ws_url}")
+        # Gelen mesajlari dinlemeye basla
         asyncio.create_task(self._receive_loop())
-        # Periyodik heartbeat döngüsünü başlat
+        # Periyodik heartbeat dongusunu baslat
         asyncio.create_task(self._send_loop())
 
     async def _receive_loop(self):
         """
-        WebSocket üzerinden gelen her mesajı alır.
-        Eğer on_message callback atanmışsa oraya, değilse verbose modda logger.info'e yollar.
-        Bağlantı kapanırsa otomatik reconnect dener.
+        WebSocket uzerinden gelen her mesaji alir.
+        Eger on_message callback atanmissa oraya, degilse verbose modda logger.info'e yollar.
+        Baglanti kapanirsa otomatik reconnect dener.
         """
         assert self._ws is not None
         try:
@@ -554,40 +554,40 @@ class WebSocket:
                     logger.info("Gelen mesaj:", msg)
         except websockets.ConnectionClosed:
             if self.verbose:
-                logger.info("🔄 Bağlantı kapandı, yeniden bağlanılıyor...")
+                logger.info("🔄 Baglanti kapandi, yeniden baglaniliyor...")
             await self.connect()
 
     async def _send_loop(self):
         """
         Belirlenen interval kadar bekleyip her seferinde
-        sadece H tipi heartbeat mesajı yollar.
+        sadece H tipi heartbeat mesaji yollar.
         """
         assert self._ws is not None
         while True:
             now = time.time()
             if now - self._last_heartbeat >= self.heartbeat_interval:
                 self._last_heartbeat = now
-                # Heartbeat mesajı
+                # Heartbeat mesaji
                 await self._send({
                     "Token": self._jwt_token,
                     "Type": "H",
                     "Symbols": []
                 })
-            # CPU kullanımını sınırlamak için kısa uyku
+            # CPU kullanimini sinirlamak icin kisa uyku
             await asyncio.sleep(1)
 
     async def _send(self, payload: dict):
         """
-        Verilen sözlüğü JSON'a çevirir ve WebSocket üzerinden gönderir.
+        Verilen sozlugu JSON'a cevirir ve WebSocket uzerinden gonderir.
         """
         assert self._ws is not None
         msg = json.dumps(payload)
         await self._ws.send(msg)
         if self.verbose:
-            logger.info("Gönderilen mesaj:", msg)
+            logger.info("Gonderilen mesaj:", msg)
 
     def start(self):
         """
-        Senkron olarak event loop başlatır ve connect() metodunu çalıştırır.
+        Senkron olarak event loop baslatir ve connect() metodunu calistirir.
         """
         asyncio.get_event_loop().run_until_complete(self.connect())

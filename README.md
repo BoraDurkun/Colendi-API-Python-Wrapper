@@ -1,92 +1,81 @@
-Aşağıda  istediğiniz iskelet ve biçimlendirme düzenine *bire bir* uyan, proje ayrıntılarınızı da dâhil eden güncel **README.md** metni yer alıyor. Dosyayı doğrudan kopyalayıp `README.md` olarak kaydedebilirsiniz.
-
-```markdown
-# 📈 Rich-Tabanlı Terminal Trading İstemcisi
-
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](#gereksinimler)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Rich](https://img.shields.io/badge/ui-rich-9B59B6?logo=python)](https://github.com/Textualize/rich)
+# 📈 Rich-Tabanlı Terminal API İstemcisi
 
 > **Hızlı bakış:**
 >
-> * 🖥️ Monokai temalı **Rich** CLI  
-> * 🔐 HMAC-imzalı **REST** + SMS-OTP oturum yönetimi  
-> * 🔄 Otomatik **WebSocket** heartbeat & reconnect  
-> * 📊 Portföy, Hisse, Vadeli işlem menüleri  
-> * 📜 Renkli JSON & ayrı **WS log** konsolu  
+> * 🖥️ Monokai temalı **Rich** CLI arabirimi
+> * 🔐 **HMAC‑imzalı** REST çağrıları + JWT **token önbelleği / otomatik yenileme**
+> * 🔄 **WebSocket** heartbeat & otomatik reconnect, ayrı canlı log penceresi
+> * 📊 Menü tabanlı **Portföy / Hisse / Vadeli** endpoint işlemleri
+> * ⏱️ Basit **rate‑limit** ve arka planda **session refresher**
+> * 📜 Renkli JSON panelleri & zengin hata bildirimleri
 
 ---
 
 ## 📂 Projedeki Dosyalar
 
-| Dosya / Dizin         | Açıklama                                | Öne Çıkanlar                                              |
-|-----------------------|-----------------------------------------|-----------------------------------------------------------|
-| **`terminal_app.py`** | Uygulamanın giriş noktası              | Tema, menüler, REST login, WS abonelik                    |
-| **`api_client.py`**   | REST & WS yardımcı sınıflar            | HMAC imza, token saklama, throttle, session refresher     |
-| **`ws_logger.py`**    | WS mesajlarını ayrı ekranda izler      | Renkli JSON paneli, zaman damgası                         |
-| **`config.py`**       | Kullanıcı-parametreleri (🛑 **boş değerleri doldurun**) | API URL, anahtarlar, kullanıcı kimlik bilgileri |
-| `rapidssl_chain.crt`  | Sunucunun ara sertifika zinciri        | TLS doğrulaması için                                     |
-| `requirements.txt`    | PIP bağımlılık listesi                  | Python ≥ 3.10                                             |
+| Dosya / Dizin                | Açıklama                                                | Öne Çıkanlar                                          |
+| ---------------------------- | ------------------------------------------------------- | ----------------------------------------------------- |
+| **`terminal_app.py`**        | Uygulamanın giriş noktası                               | Tema, menüler, REST login, WS abonelik                |
+| **`api_client.py`**          | REST & WS yardımcı sınıflar                             | HMAC imza, token saklama, throttle, session refresher |
+| **`ws_logger.py`**           | WS mesajlarını ayrı ekranda izler                       | Renkli JSON paneli, zaman damgası                     |
+| **`config.py`**              | Kullanıcı-parametreleri (🛑 **boş değerleri doldurun**) | API URL, anahtarlar, kullanıcı kimlik bilgileri       |
+| `RapidSSL_TLS_RSA_CA_G1.crt` | Sunucunun ara sertifika zinciri                         | TLS doğrulaması için                                  |
+| `requirements.txt`           | PIP bağımlılık listesi                                  | Python ≥ 3.10                                         |
 
 ---
 
 ## 🗺️ İçindekiler
-1. [Özellikler](#özellikler)  
-2. [Gereksinimler](#gereksinimler)  
-3. [Kurulum](#kurulum)  
-4. [Yapılandırma](#yapılandırma)  
-5. [Kullanım](#kullanım)  
-6. [Geliştirici Notları](#geliştirici-notları)  
-7. [Sık Sorulanlar](#sık-sorulanlar)  
+
+1. [Özellikler](#özellikler)
+2. [Gereksinimler](#gereksinimler)
+3. [Kurulum](#kurulum)
+4. [Yapılandırma](#yapılandırma)
+5. [Kullanım](#kullanım)
+6. [Geliştirici Notları](#geliştirici-notları)
+7. [Sık Sorulanlar](#sık-sorulanlar)
 8. [Katkı & Lisans](#katkı--lisans)
 
 ---
 
 ## ✨ Özellikler
 
-|                         |                                                              |
-|:------------------------|:-------------------------------------------------------------|
-| 🎨 **Zengin Arayüz**    | Monokai renk paleti, paneller, tablolar                      |
-| 🔑 **Güvenli Giriş**    | HMAC-SHA256 imzası + JWT token, SMS-OTP                       |
-| 🕒 **Rate-Limit**       | İstek başına gecikme, 60 sn’de bir otomatik token yenileme    |
-| 🌐 **WebSocket**        | TLS, heartbeat paketi, kopmada otomatik bağlanma             |
-| 📈 **Menü Akışı**       | Portföy, Hisse, Vadeli, WS abonelik menüleri                 |
-| 📑 **Renkli JSON**      | `json_panel()` ile kolay okunur REST/WS yanıtı                |
-| 🪄 **Canlı WS Logu**     | `ws_logger.py` gelen mesajları yeni konsolda gösterir         |
+|                      |                                                            |
+| -------------------- | ---------------------------------------------------------- |
+| 🎨 **Zengin Arayüz** | Monokai renk paleti, paneller, tablolar                    |
+| 🔑 **Güvenli Giriş** | HMAC-SHA256 imzası + JWT token, SMS-OTP                    |
+| 🕒 **Rate-Limit**    | İstek başına gecikme, 60 sn’de bir otomatik token yenileme |
+| 🌐 **WebSocket**     | TLS, heartbeat paketi, kopmada otomatik bağlanma           |
+| 📈 **Menü Akışı**    | Portföy, Hisse, Vadeli, WS abonelik menüleri               |
+| 📑 **Renkli JSON**   | `json_panel()` ile kolay okunur REST/WS yanıtı             |
+| 🪄 **Canlı WS Logu** | `ws_logger.py` gelen mesajları yeni konsolda gösterir      |
 
 ---
 
 ## ⚙️ Gereksinimler
 
 ```
-
 Python 3.10+
 rich        >= 13
 requests    >= 2.32
 websockets  >= 12
 urllib3     >= 2
-
-````
-
-```bash
-# önerilen: sanal ortam
-python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-````
-
----
-
-## 🚀 Kurulum
+```
 
 ```bash
-git clone https://github.com/your-org/terminal-trader.git
-cd terminal-trader
-cp example.config.py config.py   # şablonu düzenleyin
+git clone https://github.com/BoraDurkun/Colendi-API-Python-Wrapper.git
+cd Colendi-API-Python-Wrapper
+# Linux/macOS
+cp example.config.py config.py
+
+# Windows (PowerShell/CMD)
+copy example.config.py config.py
 ```
 
 > **SSL Notu**
-> Broker RapidSSL zinciri kullanıyorsa kök + ara sertifikaları
-> `rapidssl_chain.crt` dosyasında birleştirin veya burada mevcut dosyayı güncelleyin.
+>
+> > **SSL Notu**
+> > Proje dizininde **`RapidSSL_TLS_RSA_CA_G1.crt`** dosyası *hazır* olarak sunulur; sunucu ara/kök sertifika zincirini paylaşmadığından bağlantı doğrulaması bu dosya üzerinden yapılır.
+> > Dosya silinir veya bozulursa HTTPS/WS oturumu kurulamaz. Böyle bir durumda aynı zinciri yeniden indirip **aynı ada** (`RapidSSL_TLS_RSA_CA_G1.crt`) kaydedin ve `api_client.py` içinde `verify="RapidSSL_TLS_RSA_CA_G1.crt"` parametresinin yolu değişmediğinden emin olun.
 
 ---
 
@@ -95,12 +84,14 @@ cp example.config.py config.py   # şablonu düzenleyin
 `config.py` içeriğini **mutlaka** müşterinizin API bilgileri ile doldurun:
 
 ```python
-API_URL   = "https://api.broker.com"
-API_KEY   = "🚀 public-key buraya"
-API_SECRET= "🔑 secret-key buraya"
+API_HOST   = "https://api.codyalgo.com:11443"
+API_URL    = API_HOST
+API_WS_URL = "wss://api.codyalgo.com:11443/ws"
 
-USERNAME  = "👤 kullanıcı_adı"
-PASSWORD  = "🔒 şifre"
+API_KEY    = "🚀 public-key buraya"
+API_SECRET = "🔑 secret-key buraya"
+USERNAME   = "👤 kullanıcı_adı"
+PASSWORD   = "🔒 şifre"
 
 # Enum haritaları (gerekirse düzenleyin)
 DIRECTION_MAP          = {1: "BUY", 2: "SELL"}
@@ -156,7 +147,7 @@ python terminal_app.py
 
 | Problem                          | Çözüm                                                                                                                       |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `SSL: CERTIFICATE_VERIFY_FAILED` | `rapidssl_chain.crt` yolunu ve CA zincirini doğrulayın.                                                                     |
+| `SSL: CERTIFICATE_VERIFY_FAILED` | `RapidSSL_TLS_RSA_CA_G1.crt` yolunu ve CA zincirini doğrulayın.                                                             |
 | `OTP yanıtında token yok`        | `USERNAME` / `PASSWORD` hatalı olabilir; broker hesabınızdaki SMS yetkisini kontrol edin.                                   |
 | Sürekli `ConnectionClosed`       | Ağ kesintisi veya sunucu idle-timeout. Uygulama otomatik yeniden bağlanır; gerekirse `heartbeat_interval` değerini azaltın. |
 
@@ -172,9 +163,3 @@ Bu proje **MIT** lisansı ile dağıtılmaktadır – ayrıntı için `LICENSE` 
 ---
 
 > “Terminalin gücü, renklerin cazibesiyle buluştu.” ✨
-
-```
-
-> **Not:**  
-> Yukarıdaki metin, siz zip dosyanızı incelerken tespit edilen tüm dizin / dosya adları ve işlevlerine göre düzenlendi. `config.py`’deki boş kimlik alanlarını doldurduğunuzdan emin olun; aksi hâlde uygulama açılışta duracaktır.
-```

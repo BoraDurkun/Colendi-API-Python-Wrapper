@@ -1,54 +1,77 @@
-````markdown
+Aşağıda  istediğiniz iskelet ve biçimlendirme düzenine *bire bir* uyan, proje ayrıntılarınızı da dâhil eden güncel **README.md** metni yer alıyor. Dosyayı doğrudan kopyalayıp `README.md` olarak kaydedebilirsiniz.
+
+```markdown
 # 📈 Rich-Tabanlı Terminal Trading İstemcisi
 
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](#kurulum)  
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)  
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](#gereksinimler)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Rich](https://img.shields.io/badge/ui-rich-9B59B6?logo=python)](https://github.com/Textualize/rich)
 
-> **Hızlı Bakış**  
-> • Monokai temalı **Rich** CLI  
-> • 🔐 HMAC-imzalı **REST** + SMS-OTP oturum yönetimi  
-> • 🔄 Otomatik **WebSocket** heartbeat & reconnect  
-> • 📊 Portföy / Hisse / Vadeli menüleri  
-> • 📜 Renkli JSON & ayrı **WS log** konsolu  
+> **Hızlı bakış:**
+>
+> * 🖥️ Monokai temalı **Rich** CLI  
+> * 🔐 HMAC-imzalı **REST** + SMS-OTP oturum yönetimi  
+> * 🔄 Otomatik **WebSocket** heartbeat & reconnect  
+> * 📊 Portföy, Hisse, Vadeli işlem menüleri  
+> * 📜 Renkli JSON & ayrı **WS log** konsolu  
 
 ---
 
-## 📁 Proje Yapısı
+## 📂 Projedeki Dosyalar
 
-| Dosya / Dizin           | Açıklama                                                      |
-|-------------------------|--------------------------------------------------------------|
-| `console_app.py`        | Uygulamanın **giriş noktası** – menüler, REST login, WS UI    |
-| `api_client.py`         | REST + WS yardımcı sınıflar (HMAC, throttle, token saklama)   |
-| `config.py`             | **Boş kimlik alanları** bulunan yapılandırma dosyası          |
-| `ws_logger.py`          | WebSocket mesajlarını ayrı konsolda renkli olarak gösterir    |
-| `rapidssl_chain.crt`    | Sunucuya ait **ara sertifika** zinciri                       |
-| `requirements.txt`      | Pip bağımlılıkları                                           |
-| `.gitattributes`, `.gitignore` | Git yardımcı dosyaları                              |
-| `LICENSE`               | MIT lisansı                                                  |
+| Dosya / Dizin         | Açıklama                                | Öne Çıkanlar                                              |
+|-----------------------|-----------------------------------------|-----------------------------------------------------------|
+| **`terminal_app.py`** | Uygulamanın giriş noktası              | Tema, menüler, REST login, WS abonelik                    |
+| **`api_client.py`**   | REST & WS yardımcı sınıflar            | HMAC imza, token saklama, throttle, session refresher     |
+| **`ws_logger.py`**    | WS mesajlarını ayrı ekranda izler      | Renkli JSON paneli, zaman damgası                         |
+| **`config.py`**       | Kullanıcı-parametreleri (🛑 **boş değerleri doldurun**) | API URL, anahtarlar, kullanıcı kimlik bilgileri |
+| `rapidssl_chain.crt`  | Sunucunun ara sertifika zinciri        | TLS doğrulaması için                                     |
+| `requirements.txt`    | PIP bağımlılık listesi                  | Python ≥ 3.10                                             |
+
+---
+
+## 🗺️ İçindekiler
+1. [Özellikler](#özellikler)  
+2. [Gereksinimler](#gereksinimler)  
+3. [Kurulum](#kurulum)  
+4. [Yapılandırma](#yapılandırma)  
+5. [Kullanım](#kullanım)  
+6. [Geliştirici Notları](#geliştirici-notları)  
+7. [Sık Sorulanlar](#sık-sorulanlar)  
+8. [Katkı & Lisans](#katkı--lisans)
 
 ---
 
 ## ✨ Özellikler
 
-| | |
-|:-|:-|
-| 🎨 **Zengin Arayüz** | Monokai renk paleti, paneller, tablolar |
-| 🔑 **Güvenli Kimlik Doğrulama** | HMAC-SHA256 imzası + JWT token, SMS-OTP |
-| 🕒 **Rate-Limit & Yenileme** | İstek başına bekleme, 60 s’de bir otomatik token tazeleme |
-| 🌐 **WebSocket İstemcisi** | TLS, `heartbeat` paketi, kopmada otomatik bağlanma |
-| 🪄 **Ayrı Log Konsolu** | `ws_logger.py` gelen WS mesajlarını canlı gösterir |
+|                         |                                                              |
+|:------------------------|:-------------------------------------------------------------|
+| 🎨 **Zengin Arayüz**    | Monokai renk paleti, paneller, tablolar                      |
+| 🔑 **Güvenli Giriş**    | HMAC-SHA256 imzası + JWT token, SMS-OTP                       |
+| 🕒 **Rate-Limit**       | İstek başına gecikme, 60 sn’de bir otomatik token yenileme    |
+| 🌐 **WebSocket**        | TLS, heartbeat paketi, kopmada otomatik bağlanma             |
+| 📈 **Menü Akışı**       | Portföy, Hisse, Vadeli, WS abonelik menüleri                 |
+| 📑 **Renkli JSON**      | `json_panel()` ile kolay okunur REST/WS yanıtı                |
+| 🪄 **Canlı WS Logu**     | `ws_logger.py` gelen mesajları yeni konsolda gösterir         |
 
 ---
 
 ## ⚙️ Gereksinimler
 
-```text
+```
+
 Python 3.10+
 rich        >= 13
 requests    >= 2.32
 websockets  >= 12
 urllib3     >= 2
+
+````
+
+```bash
+# önerilen: sanal ortam
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ````
 
 ---
@@ -58,51 +81,46 @@ urllib3     >= 2
 ```bash
 git clone https://github.com/your-org/terminal-trader.git
 cd terminal-trader
-
-# Sanal ortam (önerilir)
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-
-pip install -r requirements.txt
+cp example.config.py config.py   # şablonu düzenleyin
 ```
 
-### SSL Sertifikası
-
-Broker’ın sunucusu RapidSSL zinciri kullanıyorsa kök + ara sertifikalar **rapidssl\_chain.crt** dosyasında hazırdır. Gerekirse kendi zincirinizi aynı dosya adına yazarak değiştirin.
+> **SSL Notu**
+> Broker RapidSSL zinciri kullanıyorsa kök + ara sertifikaları
+> `rapidssl_chain.crt` dosyasında birleştirin veya burada mevcut dosyayı güncelleyin.
 
 ---
 
-## 🔐 Yapılandırma (❗ Zorunlu)
+## 🛠️ Yapılandırma
 
-1. `config.py` dosyasını açın.
-2. Aşağıdaki alanları **müşterinizin API kimlik bilgileri** ile doldurun:
+`config.py` içeriğini **mutlaka** müşterinizin API bilgileri ile doldurun:
 
 ```python
-API_KEY    = "🚀 public key buraya"
-API_SECRET = "🔑 secret key buraya"
-USERNAME   = "👤 internet kullanıcı adı"
-PASSWORD   = "🔒 şifre"
+API_URL   = "https://api.broker.com"
+API_KEY   = "🚀 public-key buraya"
+API_SECRET= "🔑 secret-key buraya"
+
+USERNAME  = "👤 kullanıcı_adı"
+PASSWORD  = "🔒 şifre"
+
+# Enum haritaları (gerekirse düzenleyin)
+DIRECTION_MAP          = {1: "BUY", 2: "SELL"}
+WEBSOCKET_SUBSCRIBE    = {1: "AddT", 2: "AddY", 3: "AddD"}
+WEBSOCKET_UNSUBSCRIBE  = {1: "RemoveT", 2: "RemoveY", 3: "RemoveD"}
 ```
 
-> Boş bırakırsanız uygulama başlarken hata verir ve kapanır.
-
-3. Gerekirse `API_HOST`/`API_URL`/`API_WS_URL` değerlerini değiştirin.
-
-Kimlik bilgileri sadece yerel makinenizde saklanır; Git’e **asla** commit etmeyin.
+> `config.py` ve çalışma anında oluşan `api_settings.json` **.gitignore** içinde kalmalıdır.
 
 ---
 
-## ▶️ Çalıştırma
+## ▶️ Kullanım
 
 ```bash
-python console_app.py
+python terminal_app.py
 ```
 
-1. **API bilgileri** ekranda görünür.
-2. Kayıtlı bir `api_settings.json` dosyası varsa token doğrulanır; yoksa **OTP** akışı başlar:
-
-   * “SMS kodu:” prompt’una gelen kodu girin.
-3. Başarılı girişten sonra **Ana Menü** açılır:
+1. **API Bilgileri** ekranda görünür.
+2. Kayıtlı token geçerliyse direkt giriş; değilse **OTP** akışı başlar.
+3. Giriş başarılıysa **Ana Menü** gelir:
 
 ```
 1) Portfolio Endpoints Menüsü
@@ -112,54 +130,51 @@ python console_app.py
 *) Çıkış
 ```
 
-### WebSocket Abonelik Akışı
+### WebSocket Aboneliği
 
 ```
-[1] Abone Ol   •  AddT / AddD / AddY
-[2] Abonelikten Çık •  RemoveT / RemoveY / RemoveD
+[1] Abone Ol      # AddT / AddY / AddD ...
+[2] Abonelikten Çık  # RemoveT / RemoveY / RemoveD ...
 ```
 
-* İstenen mesaj tipini seçin.
-* Sembolleri virgülle ayırarak girin (`GARAN,AKBNK` …).
-* Başarılı işlem ✓ ile onaylanır.
-* Tüm gelen WS paketleri yeni açılan **ws\_logger** penceresine akar.
+* Mesaj tipini seçin
+* Sembolleri virgülle ayırarak girin (`GARAN,AKBNK`)
+* Başarılıysa ✓ onayı gelir; WS paketleri **ws\_logger** penceresine düşer.
 
 ---
 
-## 🛠️ Geliştirici Notları
+## 🧑‍💻 Geliştirici Notları
 
-* **Threading + asyncio** – WebSocket ayrı daemon thread içinde kendi event-loop’una sahiptir.
-* **Throttle** – `API.interval` (varsayılan `1 s`) her çağrı arasında bekler.
-* **Token saklama** – JWT, `api_settings.json` dosyasında AES’siz düz metin olarak tutulur; güvenlik modeli kendi sorumluluğunuzdadır.
-* **Kod stili** – `black --line-length 100` & `ruff` ile uyumlu.
+* **Threading + asyncio** – WS ayrı daemon thread’de kendi event-loop’u ile çalışır.
+* **Throttle** – `API.interval` (varsayılan 1 sn) her istekten önce bekler.
+* **Loglama** – Tüm REST/WS olayları `logs.log` dosyasına INFO seviyesiyle yazılır.
+* **Kod Stili** – `black --line-length 100` & `ruff` kullanmanız önerilir.
 
 ---
 
 ## ❓ Sık Sorulanlar
 
-| Problem                          | Çözüm                                                                                                                         |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `SSL: CERTIFICATE_VERIFY_FAILED` | `rapidssl_chain.crt` yolunu ve içerdiği CA zincirini kontrol edin.                                                            |
-| `OTP yanıtında token yok`        | `USERNAME` / `PASSWORD` hatalı olabilir; broker hesabınızı kontrol edin.                                                      |
-| Sürekli `ConnectionClosed`       | Ağ kesintisi veya sunucu ‘idle timeout’. Uygulama otomatik yeniden bağlanır; gerekirse `heartbeat_interval` değerini düşürün. |
+| Problem                          | Çözüm                                                                                                                       |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `SSL: CERTIFICATE_VERIFY_FAILED` | `rapidssl_chain.crt` yolunu ve CA zincirini doğrulayın.                                                                     |
+| `OTP yanıtında token yok`        | `USERNAME` / `PASSWORD` hatalı olabilir; broker hesabınızdaki SMS yetkisini kontrol edin.                                   |
+| Sürekli `ConnectionClosed`       | Ağ kesintisi veya sunucu idle-timeout. Uygulama otomatik yeniden bağlanır; gerekirse `heartbeat_interval` değerini azaltın. |
 
 ---
 
-## 🤝 Katkı
+## 🤝 Katkı & Lisans
 
-1. **Fork** → yeni branch → değişiklik → **Pull Request**
-2. PR açıklamasında neyi, neden değiştirdiğinizi belirtin.
-3. Test eklemeyi unutmayın.
+* PR göndermeden önce **fork → branch → değişiklik → PR** adımlarını izleyin.
+* PR açıklamasına “neyi, neden” değiştirdiğinizi yazın, mümkünse test ekleyin.
 
----
-
-## 📜 Lisans
-
-Bu proje **MIT** lisansı ile dağıtılmaktadır – ayrıntılar için `LICENSE` dosyasına bakın.
+Bu proje **MIT** lisansı ile dağıtılmaktadır – ayrıntı için `LICENSE` dosyasına bakın.
 
 ---
 
-> *“Terminalin gücü, renklerin cazibesiyle buluştu.”* ✨
+> “Terminalin gücü, renklerin cazibesiyle buluştu.” ✨
 
 ```
+
+> **Not:**  
+> Yukarıdaki metin, siz zip dosyanızı incelerken tespit edilen tüm dizin / dosya adları ve işlevlerine göre düzenlendi. `config.py`’deki boş kimlik alanlarını doldurduğunuzdan emin olun; aksi hâlde uygulama açılışta duracaktır.
 ```

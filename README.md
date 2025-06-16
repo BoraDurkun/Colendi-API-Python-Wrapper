@@ -26,14 +26,13 @@
 
 ## 🗺️ İçindekiler
 
-1. [Özellikler](#özellikler)
-2. [Gereksinimler](#gereksinimler)
-3. [Kurulum](#kurulum)
-4. [Yapılandırma](#yapılandırma)
-5. [Kullanım](#kullanım)
-6. [Geliştirici Notları](#geliştirici-notları)
-7. [Sık Sorulanlar](#sık-sorulanlar)
-8. [Katkı & Lisans](#katkı--lisans)
+1. [Özellikler](#-özellikler)
+2. [Gereksinimler](#%EF%B8%8F-gereksinimler)
+4. [Yapılandırma](#%EF%B8%8F-yapılandırma)
+5. [Kullanım](#%EF%B8%8F-kullanım)
+6. [Geliştirici Notları](#-geliştirici-notları)
+7. [Sık Sorulanlar](#-sık-sorulanlar)
+8. [Katkı & Lisans](#-katkı--lisans)
 
 ---
 

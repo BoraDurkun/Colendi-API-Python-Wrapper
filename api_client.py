@@ -202,7 +202,7 @@ class API:
         self._throttle()
         url = f"{self._api_url}{path}"
         resp = requests.post(url, data=body_str.encode("utf-8"),
-                             headers=headers, timeout=60, verify="rapidssl_chain.crt")
+                             headers=headers, timeout=60, verify="RapidSSL_TLS_RSA_CA_G1.crt")
         
         if self.verbose and resp.status_code == 200:
             logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
@@ -532,7 +532,7 @@ class WebSocket:
         }
 
         # Ara sertifikayı içeren dosyanın yolu
-        ca_path = "rapidssl_chain.crt"
+        ca_path = "RapidSSL_TLS_RSA_CA_G1.crt"
         ssl_context = ssl.create_default_context(cafile=ca_path)
         ssl_context.check_hostname = True
 

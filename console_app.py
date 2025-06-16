@@ -3,7 +3,6 @@ Rich tabanlı terminal uygulaması:
   • REST login
   • Portfolio / Stock / Future endpoint menüleri
   • WebSocket abonelik menüsü (AddT/AddY/AddD …)
-  • Kapanışta temiz kaynak yönetimi
 """
 
 # ── Standart kütüphaneler ───────────────────────────────────────────────

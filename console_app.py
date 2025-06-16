@@ -1,9 +1,18 @@
-import sys
-from typing import Optional, cast
-from datetime import datetime
-from requests.exceptions import RequestException
+"""
+Rich tabanlı terminal uygulaması:
+  • REST login
+  • Portfolio / Stock / Future endpoint menüleri
+  • WebSocket abonelik menüsü (AddT/AddY/AddD …)
+  • Kapanışta temiz kaynak yönetimi
+"""
 
-import json
+# ── Standart kütüphaneler ───────────────────────────────────────────────
+import os, sys, subprocess, time, json, asyncio, threading
+from datetime import datetime
+from typing import Optional, cast
+
+# ── Üçüncü parti ────────────────────────────────────────────────────────
+from requests.exceptions import RequestException
 from rich.console import Console
 from rich.theme import Theme
 from rich.syntax import Syntax
@@ -12,244 +21,242 @@ from rich.text import Text
 from rich.prompt import Prompt
 from rich.table import Table
 
+# ── Yerel modüller ───────────────────────────────────────────────────────
+from api_client import API, WebSocket
+from config import (
+    API_URL, API_KEY, API_SECRET, USERNAME, PASSWORD,
+    DIRECTION_MAP, ORDER_METHOD_MAP, ORDER_DURATION_MAP,
+    ORDER_STATUS_MAP, EQUITY_TYPE_MAP,
+    VIOP_LONG_SHORT_MAP, VIOP_CONTRACT_TYPE_MAP,
+    WEBSOCKET_SUBSCRIBE, WEBSOCKET_UNSUBSCRIBE
+)
+
+# ── Rich tema tanımı ─────────────────────────────────────────────────────
 theme = Theme({
-    "repr.string": "#E6DB74",
-    "repr.number": "#81A7FF",
-    "repr.bool_true": "#A6E22E",
+    "repr.string":     "#E6DB74",
+    "repr.number":     "#81A7FF",
+    "repr.bool_true":  "#A6E22E",
     "repr.bool_false": "#F92672",
-    "repr.none": "#75715E",
-    "repr.key": "bold #66D9EF",
-
-    "label": "bold #E6DB74",
-    "value": "italic #F8F8F2",
-
-    "info": "bold #66D9EF",
+    "repr.none":       "#75715E",
+    "repr.key":        "bold #66D9EF",
+    "label":   "bold #E6DB74",
+    "value":   "italic #F8F8F2",
+    "info":    "bold #66D9EF",
     "warning": "italic #E69F00",
-    "error": "bold #FF5555",
+    "error":   "bold #FF5555",
     "success": "bold #50FA7B",
-
-    "prompt": "bold #8BE9FD",
-    "menu": "#F8F8F2",
-    "title": "bold #81A7FF",
+    "prompt":  "bold #8BE9FD",
+    "menu":    "#F8F8F2",
+    "title":   "bold #81A7FF",
     "highlight": "reverse #44475A",
 })
-
 console = Console(theme=theme)
 
-from api_client import API, WebSocket
-from config import *
+# ── Global nesneler ──────────────────────────────────────────────────────
+api: Optional[API]                      = None
+ws: Optional[WebSocket]                 = None
+loop: Optional[asyncio.AbstractEventLoop] = None
+ws_thread: Optional[threading.Thread]   = None
+logger_proc: Optional[subprocess.Popen] = None
 
-# Global API istemcisi
-api: Optional[API] = None
-
-# ——— Pretty print functions ———
-
-def show_api_info():
-    table = Table.grid(padding=(0, 1))
-    table.add_column(style="label", justify="right")
-    table.add_column(style="value")
-    table.add_row("Api Url:", f"[highlight]{API_URL}[/]")
-    table.add_row("Api Key:", API_KEY)
-    table.add_row("Secret Key:", API_SECRET)
-    table.add_row("Müşteri No:", USERNAME or "-")
-    table.add_row("Şifre:", PASSWORD or "-")
-
-    console.print()
-    console.print(Panel(table, title="[title]Api Bilgileri[/title]", border_style="highlight", padding=(1, 2)))
-    console.print()
-
-
+# ════════════════════════════════════════════════════════════════════════
+# RICH yardımcıları
+# ------------------------------------------------------------------------
 def json_panel(data: dict | list, title: str = "JSON") -> None:
-    """
-    JSON verisini renklendirip panel içinde gösterir.
-    """
-    syntax = Syntax(
-        json.dumps(data, indent=2, ensure_ascii=False),
-        "json",
-        theme="monokai",
-        line_numbers=False,
-    )
-    console.print()
-    console.print(Panel(syntax, title=f"[title]{title}[/title]", border_style="highlight", padding=(1, 2)))
-    console.print()
+    syntax = Syntax(json.dumps(data, indent=2, ensure_ascii=False),
+                    "json", theme="monokai", line_numbers=False)
+    console.print(Panel(syntax, title=f"[title]{title}[/title]",
+                        border_style="yellow"))
 
 def select_from_menu(title: str, options: list[tuple[str, str]]) -> str:
-
-    lines = [f"[prompt]{key}[/prompt]  {desc}" for key, desc in options]
-    body = Text.from_markup("\n".join(lines))
-    panel = Panel(body, title=f"[title]{title}[/title]", border_style="highlight", expand=False)
-    console.print()
-    console.print(panel)
-    console.print()
-
+    body = Text.from_markup("\n".join(f"[prompt]{k}[/prompt]  {d}"
+                                      for k, d in options))
+    console.print(Panel(body, title=f"[title]{title}[/title]",
+                        border_style="green", expand=False))
     return Prompt.ask("[prompt]Seçiminiz[/prompt]", default="").strip()
 
-# ── MENÜ FONKSİYONLARI ────────────────────────────────────────────────────────
-def main_menu() -> None:
-    while True:
-        choice = select_from_menu("Ana Menü", [
-            ("1", "Portfolio Endpoints Menüsü"),
-            ("2", "Stock Endpoints Menüsü"),
-            ("3", "Future Endpoints Menüsü"),
-            ("*", "Çıkış"),
-        ])
-        if choice == "1":
-            portfolio_menu()
-        elif choice == "2":
-            stock_menu()
-        elif choice == "3":
-            future_menu()
-        elif choice == "*":
-            console.print("[error]Çıkış yapılıyor…[/error]")
-            sys.exit()
-        else:
-            console.print("[warning]Geçersiz seçim.[/warning]")
+def show_api_info() -> None:
+    t = Table.grid(padding=(0, 1))
+    t.add_column(style="label", justify="right")
+    t.add_column(style="value")
+    t.add_row("API URL:",   f"[highlight]{API_URL}[/]")
+    t.add_row("API Key:",   API_KEY)
+    t.add_row("Secret:",    API_SECRET)
+    t.add_row("Kullanıcı:", USERNAME or "-")
+    t.add_row("Şifre:",     PASSWORD or "-")
+    console.print(Panel(t, title="[title]API Bilgileri[/title]",
+                        border_style="yellow"))
 
-def portfolio_menu() -> None:
-    while True:
-        choice = select_from_menu("Hesap Bilgisi Menüsü", [
-            ("1", "Alt Hesapları Görüntüle"),
-            ("2", "get_account_summary Bilgisi"),
-            ("3", "get_cash_assets Bilgisi"),
-            ("4", "get_cash_balance Bilgisi"),
-            ("5", "get_account_overall Bilgisi"),
-            ("0", "Ana Menü"),
-        ])
-        if choice == "0": return
-        elif choice == "1": get_subaccounts()
-        elif choice == "2": get_account_summary()
-        elif choice == "3": get_cash_assets()
-        elif choice == "4": get_cash_balance()
-        elif choice == "5": get_account_overall()
-        else: console.print("[warning]Geçersiz seçim.[/warning]")
+# ════════════════════════════════════════════════════════════════════════
+# WebSocket yardımcıları
+# ------------------------------------------------------------------------
+def _run_ws_loop(ws: WebSocket, evloop: asyncio.AbstractEventLoop):
+    asyncio.set_event_loop(evloop)
+    evloop.run_until_complete(ws.connect())
+    evloop.run_forever()
 
-def stock_menu() -> None:
-    while True:
-        choice = select_from_menu("Pay Emir Menüsü", [
-            ("1", "Emir Gönder"),
-            ("2", "Emir Düzelt"),
-            ("3", "Emir Sil"),
-            ("4", "Pay Emir Listesi"),
-            ("5", "Hisse Senedi Pozisyonları"),
-            ("0", "Ana Menü"),
-        ])
-        if choice == "0": return
-        elif choice == "1": get_stock_create_order()
-        elif choice == "2": get_stock_replace_order()
-        elif choice == "3": get_stock_delete_order()
-        elif choice == "4": get_stock_order_list()
-        elif choice == "5": get_stock_positions()
-        else: console.print("[warning]Geçersiz seçim.[/warning]")
+def start_websocket() -> None:
+    """WS client + logger’ı tek seferde hazırlar."""
+    global ws, loop, ws_thread, logger_proc
+    if ws:  # zaten başlatılmış
+        return
 
-def future_menu() -> None:
-    while True:
-        choice = select_from_menu("Vadeli Emir Menüsü", [
-            ("1", "Emir Gönder"),
-            ("2", "Emir Düzelt"),
-            ("3", "Emir Sil"),
-            ("4", "Vadeli Emir Listesi"),
-            ("5", "Pozisyonlar"),
-            ("0", "Ana Menü"),
-        ])
-        if choice == "0": return
-        elif choice == "1": get_future_create_order()
-        elif choice == "2": get_future_replace_order()
-        elif choice == "3": get_future_delete_order()
-        elif choice == "4": get_future_order_list()
-        elif choice == "5": get_future_positions()
-        else: console.print("[warning]Geçersiz seçim.[/warning]")
+    def on_message(msg: str):
+        if logger_proc and logger_proc.stdin:
+            logger_proc.stdin.write((msg + "\n").encode())
+            logger_proc.stdin.flush()
 
-# ——— Choice Functions ———
-def ask_optional_str(prompt: str, required: bool = False) -> Optional[str]:
-    while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} : ").strip()
-        if val == "":
-            if required:
-                console.print("❌ Bu alan zorunlu, lutfen bir deger girin.")
-                continue
-            return None
-        return val
+    # 1) WS logger süreci
+    env = os.environ.copy()
+    env["JWT_TOKEN"] = api._jwt_token               # type: ignore[attr-defined]
+    logger_proc = subprocess.Popen(
+        [sys.executable, os.path.join(os.path.dirname(__file__), "ws_logger.py")],
+        stdin=subprocess.PIPE,
+        creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+        env=env
+    )
+    console.print("[info]▶ WS log’ları için ayrı pencere açıldı.[/info]")
 
-def ask_optional_int(prompt: str, required: bool = False) -> Optional[int]:
+    # 2) WS istemcisi
+    ws = WebSocket(
+        api_url            = API_URL,
+        api_key            = API_KEY,
+        secret_key         = API_SECRET,
+        jwt_token          = api._jwt_token,        # type: ignore[attr-defined]
+        heartbeat_interval = 300,
+        verbose            = False
+    )
+    ws.on_message = on_message
+
+    # 3) Event-loop + thread
+    loop = asyncio.new_event_loop()
+    ws_thread = threading.Thread(target=_run_ws_loop, args=(ws, loop),
+                                 daemon=True)
+    ws_thread.start()
+    time.sleep(1)
+
+def graceful_shutdown():
+    """WS, event-loop, thread ve logger’ı temiz kapatır."""
+    if ws and loop:
+        try:
+            asyncio.run_coroutine_threadsafe(ws.close(), loop).result(3) # type: ignore
+        except Exception:
+            pass
+        loop.call_soon_threadsafe(loop.stop)
+    if ws_thread:
+        ws_thread.join(timeout=1)
+    if logger_proc and logger_proc.stdin:
+        logger_proc.stdin.close()
+
+# ════════════════════════════════════════════════════════════════════════
+# Giriş (REST login)
+# ------------------------------------------------------------------------
+def rich_login():
+    global api
+    if not all([API_URL, API_KEY, API_SECRET]):
+        console.print("[error]config.py’de API_URL / KEY / SECRET eksik.[/error]")
+        sys.exit(1)
+
+    api = API.get_api(api_url=cast(str, API_URL),
+                      api_key=cast(str, API_KEY),
+                      secret_key=cast(str, API_SECRET),
+                      verbose=True)
+
+    if not getattr(api, "_jwt_token", None):
+        try:
+            otp = api.send_otp(USERNAME or "", PASSWORD or "")
+        except RequestException as e:
+            console.print("[error]OTP isteği hatası:[/error]", e)
+            sys.exit(1)
+
+        token = otp.get("data", {}).get("token")
+        if not token:
+            console.print("[error]OTP yanıtında token yok.[/error]")
+            sys.exit(1)
+
+        console.print("\n[prompt]SMS kodu:[/prompt] ", end="")
+        code = input().strip()
+
+        try:
+            login_resp = api.login(token, code)
+        except RequestException as e:
+            console.print("[error]Giriş hatası:[/error]", e)
+            sys.exit(1)
+
+        if "data" not in login_resp:
+            console.print("[error]Beklenmeyen login yanıtı[/error]", login_resp)
+            sys.exit(1)
+
+        console.print("[success]✅ Giriş başarılı.[/success]")
+    else:
+        console.print("[success]✅ Kayıtlı token geçerli.[/success]")
+
+# ════════════════════════════════════════════════════════════════════════
+# Ask yardımcıları
+# ------------------------------------------------------------------------
+def ask_optional_str(prompt: str, required=False) -> Optional[str]:
     while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} : ").strip()
-        if val == "":
-            if required:
-                console.print("❌ Bu alan zorunlu, lutfen bir sayi girin.")
-                continue
+        val = Prompt.ask(prompt + (" (zorunlu)" if required else ""), default="").strip()
+        if val or not required:
+            return val or None
+        console.print("[error]Bu alan zorunlu.[/error]")
+
+def ask_optional_int(prompt: str, required=False) -> Optional[int]:
+    while True:
+        val = Prompt.ask(prompt + (" (zorunlu)" if required else ""), default="").strip()
+        if not val and not required:
             return None
         if val.isdigit():
             return int(val)
-        console.print("❌ Gecersiz girdi. Lutfen bir sayi girin veya bos birakin.")
+        console.print("[error]Sayı girin.[/error]")
 
-def ask_optional_float(prompt: str, required: bool = False) -> Optional[float]:
+def ask_optional_float(prompt: str, required=False) -> Optional[float]:
     while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} : ").strip().replace(",", ".")
-        if val == "":
-            if required:
-                console.print("❌ Bu alan zorunlu, lutfen bir ondalikli sayi girin.")
-                continue
+        val = Prompt.ask(prompt + (" (zorunlu)" if required else ""), default="").strip().replace(",", ".")
+        if not val and not required:
             return None
         try:
             return float(val)
         except ValueError:
-            console.print("❌ Gecersiz sayi. Lutfen ondalikli bir deger girin veya bos birakin.")
+            console.print("[error]Ondalıklı değer girin.[/error]")
 
-def ask_optional_bool(prompt: str, required: bool = False) -> Optional[bool]:
+def ask_optional_bool(prompt: str, required=False) -> Optional[bool]:
     while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} (1=Evet, 0=Hayir): ").strip().lower()
-        if val == "":
-            if required:
-                console.print("❌ Bu alan zorunlu, lutfen evet veya hayir girin.")
-                continue
+        val = Prompt.ask(prompt + (" (zorunlu)" if required else "") + " (1/0)", default="").strip().lower()
+        if not val and not required:
             return None
         if val in ("1", "y", "e", "yes", "true", "t"):
             return True
         if val in ("0", "n", "h", "no", "false", "f"):
             return False
-        console.print("❌ Gecersiz girdi. Lutfen 1/0 veya evet/hayir yazin.")
+        console.print("[error]1/0 veya evet/hayır yazın.[/error]")
 
-def ask_optional_date(prompt: str, required: bool = False) -> Optional[str]:
+def ask_optional_date(prompt: str, required=False) -> Optional[str]:
     while True:
-        val = input(f"{prompt}{' (zorunlu)' if required else '(bos icin Enter)'} (YYYY-MM-DD): ").strip()
-        if val == "":
-            if required:
-                console.print("❌ Bu alan zorunlu, lutfen gecerli bir tarih girin.")
-                continue
+        val = Prompt.ask(prompt + (" (zorunlu)" if required else "") + " (YYYY-MM-DD)", default="").strip()
+        if not val and not required:
             return None
         try:
             datetime.strptime(val, "%Y-%m-%d")
             return val
         except ValueError:
-            console.print("❌ Gecersiz tarih formati. YYYY-MM-DD biciminde giriniz.")
+            console.print("[error]Tarih formatı YYYY-MM-DD olmalı.[/error]")
 
-def ask_enum_choice(
-    prompt: str,
-    choice_map: dict[int, str],
-    required: bool = False
-) -> Optional[str]:
-    """
-    :param prompt: Soru metni
-    :param choice_map: {1: "A", 2: "B", ...}
-    :param required: True ise bos gecilmesine izin vermez
-    :return: Secilen deger veya None
-    """
+def ask_enum_choice(prompt: str, choice_map: dict[int, str], required=False) -> Optional[str]:
     while True:
-        console.print(f"\n{prompt} secenekleri:")
-        for key, val in choice_map.items():
-            console.print(f" {key}) {val}")
-        sel = input(f"{prompt} seciminiz{' (zorunlu)' if required else '(bos icin Enter)'}: ").strip()
-        
-        if sel == "":
-            if required:
-                console.print("❌ Bu alan zorunlu, lutfen bir secim yapin.")
-                continue
+        console.print(f"\n{prompt} seçenekleri:")
+        for k, v in choice_map.items():
+            console.print(f" {k}) {v}")
+        sel = Prompt.ask(f"{prompt} seçiminiz" + (" (zorunlu)" if required else ""), default="").strip()
+        if not sel and not required:
             return None
-        
         if sel.isdigit() and int(sel) in choice_map:
             return choice_map[int(sel)]
-        
-        console.print("❌ Gecersiz secim. Tekrar deneyin.")
+        console.print("[error]Geçersiz seçim.[/error]")
+
+# ════════════════════════════════════════════════════════════════════════
+# Endpoint Wrappers
+# ------------------------------------------------------------------------
 
 # ——— Portfolio Endpoints ———
 def get_subaccounts():
@@ -520,61 +527,151 @@ def get_future_positions():
         resp = api.get_future_positions(portfolio_number=port)
         json_panel(resp, title="get_future_positions")
  
+ # ════════════════════════════════════════════════════════════════════════
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Menü yapısı
+# ------------------------------------------------------------------------
+def main_menu():
+    while True:
+        ch = select_from_menu("Ana Menü", [
+            ("1", "Portfolio Endpoints Menüsü"),
+            ("2", "Stock Endpoints Menüsü"),
+            ("3", "Future Endpoints Menüsü"),
+            ("4", "WebSocket Abonelik Menüsü"),
+            ("*", "Çıkış"),
+        ])
+        if ch == "1":
+            portfolio_menu()
+        elif ch == "2":
+            stock_menu()
+        elif ch == "3":
+            future_menu()
+        elif ch == "4":
+            websocket_menu()
+        elif ch == "*":
+            console.print("[info]Çıkış yapılıyor…[/info]")
+            graceful_shutdown()
+            sys.exit()
+        else:
+            console.print("[warning]Geçersiz seçim.[/warning]")
+
+def portfolio_menu() -> None:
+    while True:
+        choice = select_from_menu("Hesap Bilgisi Menüsü", [
+            ("1", "Alt Hesapları Görüntüle"),
+            ("2", "get_account_summary Bilgisi"),
+            ("3", "get_cash_assets Bilgisi"),
+            ("4", "get_cash_balance Bilgisi"),
+            ("5", "get_account_overall Bilgisi"),
+            ("0", "Ana Menü"),
+        ])
+        if choice == "0": return
+        elif choice == "1": get_subaccounts()
+        elif choice == "2": get_account_summary()
+        elif choice == "3": get_cash_assets()
+        elif choice == "4": get_cash_balance()
+        elif choice == "5": get_account_overall()
+        else: console.print("[warning]Geçersiz seçim.[/warning]")
+
+def stock_menu() -> None:
+    while True:
+        choice = select_from_menu("Pay Emir Menüsü", [
+            ("1", "Emir Gönder"),
+            ("2", "Emir Düzelt"),
+            ("3", "Emir Sil"),
+            ("4", "Pay Emir Listesi"),
+            ("5", "Hisse Senedi Pozisyonları"),
+            ("0", "Ana Menü"),
+        ])
+        if choice == "0": return
+        elif choice == "1": get_stock_create_order()
+        elif choice == "2": get_stock_replace_order()
+        elif choice == "3": get_stock_delete_order()
+        elif choice == "4": get_stock_order_list()
+        elif choice == "5": get_stock_positions()
+        else: console.print("[warning]Geçersiz seçim.[/warning]")
+
+def future_menu() -> None:
+    while True:
+        choice = select_from_menu("Vadeli Emir Menüsü", [
+            ("1", "Emir Gönder"),
+            ("2", "Emir Düzelt"),
+            ("3", "Emir Sil"),
+            ("4", "Vadeli Emir Listesi"),
+            ("5", "Pozisyonlar"),
+            ("0", "Ana Menü"),
+        ])
+        if choice == "0": return
+        elif choice == "1": get_future_create_order()
+        elif choice == "2": get_future_replace_order()
+        elif choice == "3": get_future_delete_order()
+        elif choice == "4": get_future_order_list()
+        elif choice == "5": get_future_positions()
+        else: console.print("[warning]Geçersiz seçim.[/warning]")
+
+def websocket_menu():
+    start_websocket()
+    while True:
+        choice = select_from_menu("WebSocket Abonelik Menüsü", [
+            ("1", "Abone Ol"),
+            ("2", "Abonelikten Çık"),
+            ("0", "Ana Menü"),
+        ])
+
+        if choice == "0":
+            return
+
+        elif choice == "1":  # Abone ol
+            type_map = WEBSOCKET_SUBSCRIBE
+            action = "Abonelik"
+        elif choice == "2":  # Abonelikten çık
+            type_map = WEBSOCKET_UNSUBSCRIBE
+            action = "Abonelik İptali"
+        else:
+            console.print("[warning]Geçersiz seçim.[/warning]")
+            continue
+
+        # Mesaj tipi seçimi (örneğin: AddT / RemoveY)
+        typ = ask_enum_choice(f"{action} Tipi Seçin", type_map, required=True)
+        if not typ:
+            console.print("[warning]İşlem iptal edildi.[/warning]")
+            continue
+
+        # Sembol listesi gir
+        syms = Prompt.ask("[prompt]Semboller (virgülle ayırın)[/prompt]").split(",")
+        symbols = [s.strip() for s in syms if s.strip()]
+        if not symbols:
+            console.print("[warning]Geçerli sembol girilmedi.[/warning]")
+            continue
+
+        # WebSocket mesajı oluştur
+        payload = {
+            "Token": ws._jwt_token,  # type: ignore[attr-defined]
+            "Type": typ,
+            "Symbols": symbols,
+        }
+
+        try:
+            fut = asyncio.run_coroutine_threadsafe(ws._send(payload), loop)  # type: ignore[arg-type]
+            fut.result(timeout=5)
+            console.print(f"[success]✅ {action} başarılı:[/success]")
+        except Exception as e:
+            console.print(f"[error]❌ Gönderim hatası:[/error] {e}")
+
+# ════════════════════════════════════════════════════════════════════════
+# Uygulama giriş noktası
+# ------------------------------------------------------------------------
 def main():
-    global api
-    if not all([API_URL, API_KEY, API_SECRET]):
-        console.print("❌ config.py dosyasindaki API_URL, API_KEY veya API_SECRET eksik.")
-        sys.exit()
-
-    # Pylance icin kesin tip belirtimi:
-    api_url: str = cast(str, API_URL)
-    api_key: str = cast(str, API_KEY)
-    secret_key: str = cast(str, API_SECRET)
-
-    try:
-        api = API.get_api(
-            api_url=api_url,
-            api_key=api_key,
-            secret_key=secret_key,
-            verbose=True
-        )
-
-    except Exception as e:
-        console.print("❌ API baslatilamadi:", e)
-        sys.exit()
-
-    if not api._jwt_token:
-        try:
-            otp_resp = api.send_otp(USERNAME or "", PASSWORD or "")
-        except RequestException as e:
-            console.print("❌ OTP istegi sirasinda hata:", e)
-            sys.exit()
-
-        data = otp_resp.get("data")
-        if not isinstance(data, dict) or "token" not in data:
-            console.print("❌ OTP yanitinda token bulunamadi:", otp_resp)
-            sys.exit()
-
-        token = data["token"]
-        console.print("✅ OTP gonderildi.\n")
-        code = input("SMS kodunu girin: ").strip()
-
-        try:
-            login_resp = api.login(token, code)
-        except RequestException as e:
-            console.print("❌ Giris sirasinda hata:", e)
-            sys.exit()
-
-        if not isinstance(login_resp, dict) or "data" not in login_resp:
-            console.print("❌ Beklenmeyen login yaniti:", login_resp)
-            sys.exit()
-
-        console.print("✅ Giris basarili.")
-    else:
-        console.print("✅🔑 Kayitli token gecerli. Menuye geciliyor...")
-
+    console.clear()
+    show_api_info()
+    rich_login()
     main_menu()
 
 if __name__ == "__main__":
-    show_api_info()
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        graceful_shutdown()
+        console.print("\n[info]Program sonlandırıldı (Ctrl-C).[/info]")

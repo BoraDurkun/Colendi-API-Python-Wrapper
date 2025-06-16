@@ -10,6 +10,7 @@ import requests
 import asyncio
 from websockets.client import WebSocketClientProtocol # type: ignore
 import websockets
+import ssl
 import os
 import logging
 
@@ -201,7 +202,7 @@ class API:
         self._throttle()
         url = f"{self._api_url}{path}"
         resp = requests.post(url, data=body_str.encode("utf-8"),
-                             headers=headers, timeout=60, verify=False)
+                             headers=headers, timeout=60, verify="rapidssl_chain.crt")
         
         if self.verbose and resp.status_code == 200:
             logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
@@ -530,8 +531,13 @@ class WebSocket:
             'X-Timestamp': ts,
         }
 
+        # Ara sertifikayı içeren dosyanın yolu
+        ca_path = "rapidssl_chain.crt"
+        ssl_context = ssl.create_default_context(cafile=ca_path)
+        ssl_context.check_hostname = True
+
         # Baglantiyi ac
-        self._ws = await websockets.connect(self.ws_url, additional_headers=headers)
+        self._ws = await websockets.connect(self.ws_url, ssl=ssl_context, additional_headers=headers)
         if self.verbose:
             logger.info(f"✅ WebSocket baglantisi kuruldu: {self.ws_url}")
         # Gelen mesajlari dinlemeye basla
@@ -551,7 +557,7 @@ class WebSocket:
                 if callable(self.on_message):
                     self.on_message(msg)
                 elif self.verbose:
-                    logger.info("Gelen mesaj:", msg)
+                    logger.info("Gelen mesaj: %s", msg)
         except websockets.ConnectionClosed:
             if self.verbose:
                 logger.info("🔄 Baglanti kapandi, yeniden baglaniliyor...")
@@ -584,7 +590,8 @@ class WebSocket:
         msg = json.dumps(payload)
         await self._ws.send(msg)
         if self.verbose:
-            logger.info("Gonderilen mesaj:", msg)
+            logger.info("Gönderilen mesaj: %s", msg)
+
 
     def start(self):
         """

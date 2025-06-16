@@ -100,3 +100,17 @@ VIOP_LONG_SHORT_MAP = {
     1: "LONG",
     2: "SHORT",
 }
+
+# Websocket Abonelik menüsü
+WEBSOCKET_SUBSCRIBE = {
+    1: "AddT",
+    2: "AddD",
+    3: "AddY",
+}
+
+# Websocket Abonelikten çıkma menüsü
+WEBSOCKET_UNSUBSCRIBE = {
+    1: "RemoveT",
+    2: "RemoveY",
+    3: "RemoveD",
+}

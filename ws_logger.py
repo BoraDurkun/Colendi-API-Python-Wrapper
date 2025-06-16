@@ -1,41 +1,27 @@
-import os
-import asyncio
-from dotenv import load_dotenv, find_dotenv
-from api_client import WebSocket
-from config import *
-def on_message(msg: str):
-    print(f"[WS] {msg}")
+#!/usr/bin/env python3
+# ws_logger.py
 
-async def run_ws():
+import sys, json
+from datetime import datetime
+from rich.console import Console
+from rich.panel import Panel
 
-    api_url   = API_URL
-    api_key   = API_KEY
-    secret_key = API_SECRET
-    jwt_token = os.getenv("JWT_TOKEN")
+console = Console()
 
-    # Ortam değişkenlerinin None olmamasını garanti altına al
-    if api_url is None:
-        raise EnvironmentError("API_URL ortam değişkeni tanımlı değil.")
-    if api_key is None:
-        raise EnvironmentError("API_KEY ortam değişkeni tanımlı değil.")
-    if secret_key is None:
-        raise EnvironmentError("API_SECRET ortam değişkeni tanımlı değil.")
-    if jwt_token is None:
-        raise EnvironmentError("JWT_TOKEN ortam değişkeni tanımlı değil.")
-
-    ws = WebSocket(
-        api_url            = api_url,
-        api_key            = api_key,
-        secret_key         = secret_key,
-        jwt_token          = jwt_token,
-        heartbeat_interval = 300,
-        verbose            = False
-    )
-    ws.on_message = on_message
-    await ws.connect()
-
-    while True:
-        await asyncio.sleep(1)
+def main():
+    console.print("🟢 Logger başladı. Mesaj bekleniyor...\n")
+    for raw in sys.stdin:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+            ts = datetime.now().strftime("%H:%M:%S")
+            title = f"[bold green]📩 {ts}[/bold green]"
+            pretty = json.dumps(data, indent=2, ensure_ascii=False)
+            console.print(Panel.fit(pretty, title=title, border_style="green"))
+        except json.JSONDecodeError:
+            console.print(f"[red]⚠ JSON parse hatası[/red]: {raw}")
 
 if __name__ == "__main__":
-    asyncio.run(run_ws())
+    main()

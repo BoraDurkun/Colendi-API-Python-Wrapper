@@ -80,17 +80,17 @@ copy example.config.py config.py
 
 ## 🛠️ Yapılandırma
 
-`config.py` içeriğini **mutlaka** müşterinizin API bilgileri ile doldurun:
+`config.py` içeriğini **mutlaka** API bilgileriniz ile doldurun:
 
 ```python
 API_HOST   = "https://api.codyalgo.com:11443"
 API_URL    = API_HOST
 API_WS_URL = "wss://api.codyalgo.com:11443/ws"
 
-API_KEY    = "🚀 public-key buraya"
-API_SECRET = "🔑 secret-key buraya"
-USERNAME   = "👤 kullanıcı_adı"
-PASSWORD   = "🔒 şifre"
+API_KEY    = "🚀 Colendi Menkul değerler public-key bilginiz"
+API_SECRET = "🔑 Colendi Menkul değerler secret-key bilginiz"
+USERNAME   = "👤 Colendi Menkul değerler internet şubesi kullanıcı adınız "
+PASSWORD   = "🔒 Colendi Menkul değerler internet şubesi şifreniz"
 
 # Enum haritaları (gerekirse düzenleyin)
 DIRECTION_MAP          = {1: "BUY", 2: "SELL"}
@@ -160,5 +160,3 @@ python terminal_app.py
 Bu proje **MIT** lisansı ile dağıtılmaktadır – ayrıntı için `LICENSE` dosyasına bakın.
 
 ---
-
-> “Terminalin gücü, renklerin cazibesiyle buluştu.” ✨

@@ -202,14 +202,14 @@ class API:
         self._throttle()
         url = f"{self._api_url}{path}"
         resp = requests.post(url, data=body_str.encode("utf-8"),
-                             headers=headers, timeout=60, verify="RapidSSL_TLS_RSA_CA_G1.crt")
+                             headers=headers, timeout=60, verify=False)
         
         if self.verbose and resp.status_code == 200:
             logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
             logger.info(f"[RESP] {resp.json()}")            
             return resp.json()
         else:
-            logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
+            logger.error(f"[POST] {path}  --> status={resp.status_code}, resp={resp.content}")
             return {"status": resp.status_code}
         
     # ————— Authentication —————

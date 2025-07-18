@@ -171,7 +171,7 @@ def rich_login():
         token = otp.get("data", {}).get("token")
         if not token:
             console.print("[error]OTP yanıtında token yok.[/error]")
-            sys.exit(1)
+            sys.exit()
 
         console.print("\n[prompt]SMS kodu:[/prompt] ", end="")
         code = input().strip()

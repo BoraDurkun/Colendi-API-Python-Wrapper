@@ -12,9 +12,9 @@ Uygulamanın temel konfigürasyon değerlerini içerir:
 # API URL ve WebSocket
 # ——————————————————————————————————————————————————————————————————————————————
 
-API_HOST   = "https://api.codyalgo.com:11443"
+API_HOST   = "https://api.codyalgo.com"
 API_URL    = API_HOST
-API_WS_URL = "wss://api.codyalgo.com:11443/ws"
+API_WS_URL = "wss://api.codyalgo.com/ws"
 
 
 # ——————————————————————————————————————————————————————————————————————————————

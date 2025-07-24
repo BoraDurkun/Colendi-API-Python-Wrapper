@@ -202,7 +202,7 @@ class API:
         self._throttle()
         url = f"{self._api_url}{path}"
         resp = requests.post(url, data=body_str.encode("utf-8"),
-                             headers=headers, timeout=60, verify=False)
+                             headers=headers, timeout=60)
         
         if self.verbose and resp.status_code == 200:
             logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")

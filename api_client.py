@@ -532,8 +532,7 @@ class WebSocket:
         }
 
         # Ara sertifikayı içeren dosyanın yolu
-        ca_path = "RapidSSL_TLS_RSA_CA_G1.crt"
-        ssl_context = ssl.create_default_context(cafile=ca_path)
+        ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = True
 
         # Baglantiyi ac

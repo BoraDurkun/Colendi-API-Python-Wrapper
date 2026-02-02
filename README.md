@@ -19,7 +19,6 @@
 | **`api_client.py`**          | REST & WS yardımcı sınıflar                             | HMAC imza, token saklama, throttle, session refresher |
 | **`ws_logger.py`**           | WS mesajlarını ayrı ekranda izler                       | Renkli JSON paneli, zaman damgası                     |
 | **`config.py`**              | Kullanıcı-parametreleri (🛑 **boş değerleri doldurun**) | API URL, anahtarlar, kullanıcı kimlik bilgileri       |
-| `RapidSSL_TLS_RSA_CA_G1.crt` | Sunucunun ara sertifika zinciri                         | TLS doğrulaması için                                  |
 | `requirements.txt`           | PIP bağımlılık listesi                                  | Python ≥ 3.10                                         |
 
 ---
@@ -69,13 +68,6 @@ cp example.config.py config.py
 # Windows (PowerShell/CMD)
 copy example.config.py config.py
 ```
-
-> **SSL Notu**
->
-> > **SSL Notu**
-> > Proje dizininde **`RapidSSL_TLS_RSA_CA_G1.crt`** dosyası *hazır* olarak sunulur; sunucu ara/kök sertifika zincirini paylaşmadığından bağlantı doğrulaması bu dosya üzerinden yapılır.
-> > Dosya silinir veya bozulursa HTTPS/WS oturumu kurulamaz. Böyle bir durumda aynı zinciri yeniden indirip **aynı ada** (`RapidSSL_TLS_RSA_CA_G1.crt`) kaydedin ve `api_client.py` içinde `verify="RapidSSL_TLS_RSA_CA_G1.crt"` parametresinin yolu değişmediğinden emin olun.
-
 ---
 
 ## 🛠️ Yapılandırma
@@ -145,8 +137,7 @@ python terminal_app.py
 ## ❓ Sık Sorulanlar
 
 | Problem                          | Çözüm                                                                                                                       |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `SSL: CERTIFICATE_VERIFY_FAILED` | `RapidSSL_TLS_RSA_CA_G1.crt` yolunu ve CA zincirini doğrulayın.                                                             |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |                                                          |
 | `OTP yanıtında token yok`        | `USERNAME` / `PASSWORD` hatalı olabilir; broker hesabınızdaki SMS yetkisini kontrol edin.                                   |
 | Sürekli `ConnectionClosed`       | Ağ kesintisi veya sunucu idle-timeout. Uygulama otomatik yeniden bağlanır; gerekirse `heartbeat_interval` değerini azaltın. |
 

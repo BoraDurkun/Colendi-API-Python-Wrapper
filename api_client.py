@@ -67,8 +67,8 @@ class API:
     ):
         self.verbose      = verbose
         self._api_url     = api_url.rstrip("/")
-        self._client_key  = api_key
-        self._secret_key  = secret_key
+        self._client_key  = api_key.strip()
+        self._secret_key  = secret_key.strip()
         self._last_req = 0.0
         self.interval = 1 # İstekler arasinda kac saniye olsun
         
@@ -78,7 +78,7 @@ class API:
         if self._jwt_token:
             if self.verbose:
                 logger.info(f"✅ Yuklendi: {self.TOKEN_FILE}")
-            resp = self.get_subaccounts()
+            resp = self.get_portfolio_stock()
             stat = resp.get("statusCode", "status")
             
             if stat == 200:
@@ -97,22 +97,22 @@ class API:
         # ————— AUTO-SESSION REFRESH MEKANİZMASI —————
     def _start_session_refresher(self):
         """
-        Arka planda daemon thread ile her 60 saniyede bir
-        get_subaccounts() cagirip session'i yeniler.
+        Arka planda daemon thread ile her 270 saniyede bir
+        PortfolioStock cagirip session'i yeniler.
         """
         thread = threading.Thread(target=self._session_refresher_loop, daemon=True)
         thread.start()
 
     def _session_refresher_loop(self):
         while True:
-            time.sleep(60)
+            time.sleep(270) # 4.5 dakika bekle
             if not self._jwt_token:
                 # Henuz login olunmadiysa atla
                 continue
             try:
-                self.get_subaccounts()
+                self.get_portfolio_stock()
                 if self.verbose:
-                    logger.info("🔄 Session refreshed via get_subaccounts()")
+                    logger.info("Session refreshed via PortfolioStock")
             except Exception as e:
                 if self.verbose:
                     logger.warning(f"❌ Session refresh failed: {e}")
@@ -123,18 +123,18 @@ class API:
         # Dosya yoksa olustur ve bos token dondur
         if not os.path.isfile(cls.TOKEN_FILE):
             with open(cls.TOKEN_FILE, "w", encoding="utf-8") as f:
-                json.dump({"jwtToken": ""}, f, ensure_ascii=False)
+                json.dump({"accessToken": ""}, f, ensure_ascii=False)
             return ""
         # Var olan dosyayi oku
         try:
             with open(cls.TOKEN_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            return data.get("jwtToken", "")
+            return data.get("accessToken") or data.get("jwtToken", "")
         except Exception as e:
             # Hata varsa dosyayi sifirla
             logger.warning(f"Hata olustu: {e}. Token dosyasi sifirlaniyor.")
             with open(cls.TOKEN_FILE, "w", encoding="utf-8") as f:
-                json.dump({"jwtToken": ""}, f, ensure_ascii=False)
+                json.dump({"accessToken": ""}, f, ensure_ascii=False)
             return ""
 
     @classmethod
@@ -147,7 +147,7 @@ class API:
 
     def _save_token(self):
         with open(self.TOKEN_FILE, "w", encoding="utf-8") as f:
-            json.dump({"jwtToken": self._jwt_token}, f, ensure_ascii=False)
+            json.dump({"accessToken": self._jwt_token}, f, ensure_ascii=False)
         
     def _timestamp(self) -> str:
         return str(int(time.time()))
@@ -190,7 +190,7 @@ class API:
         sig      = self._make_signature(path, body_str, ts)
 
         headers = {
-            "X-ClientKey": self._client_key,
+            "X-ApiKey": self._client_key,
             "X-Timestamp": ts,
             "X-Signature": sig,
             "Content-Type": "application/json; charset=utf-8",
@@ -204,251 +204,345 @@ class API:
         resp = requests.post(url, data=body_str.encode("utf-8"),
                              headers=headers, timeout=60)
         
-        if self.verbose and resp.status_code == 200:
-            logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
-            logger.info(f"[RESP] {resp.json()}")            
-            return resp.json()
-        else:
+        if resp.status_code == 200:
+            data = resp.json()
+            if self.verbose:
+                logger.info(f"[POST] {path}  --> status {resp.status_code}, body={body_str}")
+                logger.info(f"[RESP] {data}")
+            return data
+
+        try:
+            data = resp.json()
+        except ValueError:
+            data = {"status": resp.status_code, "content": resp.text}
+
+        if self.verbose:
             logger.error(f"[POST] {path}  --> status={resp.status_code}, resp={resp.content}")
-            return {"status": resp.status_code}
+        return data
+
+    def _get(
+        self,
+        endpoint: str,
+        *,
+        require_auth: bool = True
+    ) -> Dict[str, Any]:
+        """
+        GET istekleri bu metot uzerinden gider.
+        Signature hesaplanirken body bos string olarak kullanilir.
+        """
+        path = endpoint if endpoint.startswith("/") else f"/{endpoint}"
+        ts = self._timestamp()
+        sig = self._make_signature(path, "", ts)
+
+        headers = {
+            "X-ApiKey": self._client_key,
+            "X-Timestamp": ts,
+            "X-Signature": sig,
+            "Accept": "application/json; charset=utf-8",
+        }
+        if require_auth and self._jwt_token:
+            headers["Authorization"] = f"Bearer {self._jwt_token}"
+
+        self._throttle()
+        url = f"{self._api_url}{path}"
+        resp = requests.get(url, headers=headers, timeout=60)
+
+        if resp.status_code == 200:
+            data = resp.json()
+            if self.verbose:
+                logger.info(f"[GET] {path}  --> status {resp.status_code}")
+                logger.info(f"[RESP] {data}")
+            return data
+
+        try:
+            data = resp.json()
+        except ValueError:
+            data = {"status": resp.status_code, "content": resp.text}
+
+        if self.verbose:
+            logger.error(f"[GET] {path}  --> status={resp.status_code}, resp={resp.content}")
+        return data
         
     # ————— Authentication —————
     def send_otp(self, internet_user: str, password: str) -> Dict[str, Any]:
         """
-        OTP gonderir. require_auth=False ile JWT header eklenmez.
+        SMS Alma
+        Bu endpoint, kullanıcı doğrulama işlemleri için kullanılmaktadır.
+        Endpoint: /Login/LoginSendOtp
+        İstek Değişkenleri:
+        "userName": İnternet şubesi kullanıcı giriş bilgisi. String değer girilmelidir.
+        "password": İnternet şubesi kullanıcı şifresi. String değer girilmelidir.
         """
-        return self._post("Identity/SendOtp",
-                          {"internetUser": internet_user, "password": password},
+        return self._post("/Login/LoginSendOtp",
+                          {"userName": internet_user, "password": password},
                           require_auth=False)
 
-    def login(self, token: str, otp: str) -> Dict[str, Any]:
+    def login(
+        self,
+        otp_code: str,
+        *,
+        user_name: str,
+        password: str
+    ) -> Dict[str, Any]:
         """
-        SMS koduyla login olur ve JWT token’i kaydeder.
+        SMS Doğrulama
+        Bu endpoint, kullanıcı OTP doğrulama işlemleri için kullanılmaktadır.
+        Endpoint: /Login/LoginVerifyOtp
+        İstek Değişkenleri:
+        "userName": İnternet şubesi kullanıcı giriş bilgisi. String değer girilmelidir.
+        "password": İnternet şubesi kullanıcı şifresi. String değer girilmelidir.
+        "otpCode": Kullanıcının kayıtlı telefon numarasına SMS ile gönderilen OTP doğrulama kodu. String değer girilmelidir.
         """
-        resp = self._post("Identity/Login",
-                          {"token": token, "otp": otp},
+        resp = self._post("/Login/LoginVerifyOtp",
+                          {
+                              "userName": user_name,
+                              "password": password,
+                              "otpCode": otp_code
+                          },
                           require_auth=False)
-        self._jwt_token = resp["data"]["jwtToken"]
+        data = resp.get("data") or resp.get("Data") or {}
+        access_token = data.get("accessToken") or data.get("AccessToken")
+        if not access_token:
+            return resp
+        self._jwt_token = access_token
         self._save_token()
         if self.verbose:
             logger.info("✅ Login successful, JWT token stored.")
         return resp
 
     # ————— Portfolio Endpoints —————
-    def get_subaccounts(self) -> Dict[str, Any]:
-        return self._post("Portfolio/SubAccounts", {})
+    def get_portfolio_stock(self) -> Dict[str, Any]:
+        """
+        Hisse Senedi Portföyü ve Nakit Akışı
+        Bu endpoint, kullanıcı portföy nakit akışı ve limit bilgilerini görüntülemek için kullanılmaktadır.
+        Endpoint: /Portfolio/PortfolioStock
+        Bu endpoint için request body gönderilmez.
+        """
+        return self._get("Portfolio/PortfolioStock")
 
-    def get_account_summary(self, portfolio_number: int) -> Dict[str, Any]:
-        return self._post("Portfolio/AccountSummary",
-                          {"portfolioNumber": portfolio_number})
+    def get_portfolio_future(self) -> Dict[str, Any]:
+        """
+        Viop Portföyü ve Viop Nakit Akışı
+        Bu endpoint, kullanıcı VIOP portföy nakit akışı ve limitlerini görüntüleme işlemleri için kullanılmaktadır.
+        Endpoint: /Portfolio/PortfolioFuture
+        Bu endpoint için request body gönderilmez.
+        """
+        return self._get("Portfolio/PortfolioFuture")
 
-    def get_cash_assets(self, portfolio_number: int) -> Dict[str, Any]:
-        return self._post("Portfolio/CashAssets",
-                          {"portfolioNumber": portfolio_number})
-
-    def get_cash_balance(self, portfolio_number: int) -> Dict[str, Any]:
-        return self._post("Portfolio/CashBalance",
-                          {"portfolioNumber": portfolio_number})
-
-    def get_account_overall(self, portfolio_number: int) -> Dict[str, Any]:
-        return self._post("Portfolio/AccountOverall",
-                          {"portfolioNumber": portfolio_number})
+    def get_portfolio_fund(self) -> Dict[str, Any]:
+        """
+        Fon Portföyü ve Fon Nakit Akışı
+        Bu endpoint, kullanıcı fon portföy nakit akışı ve limitlerini görüntüleme işlemleri için kullanılmaktadır.
+        Endpoint: /Portfolio/PortfolioFund
+        Bu endpoint için request body gönderilmez.
+        """
+        return self._get("Portfolio/PortfolioFund")
 
     # ————— Stock Endpoints —————
-    def get_stock_create_order(
+    def new_stock_order(
         self,
-        portfolio_number: int,
-        equity_code: str,
-        quantity: int,
-        direction: str,
+        code: str,
+        buy_sell: str,
+        order_type: str,
+        session: str,
+        quantity: float,
         price: float,
-        order_method: str,
-        order_duration: str,
-        market_risk_approval: Optional[bool] = None
+        sub_market: Optional[str] = None
     ) -> Dict[str, Any]:
-        payload = {
-            "portfolioNumber": portfolio_number,
-            "equityCode": equity_code,
+        """
+        Hisse Senedi Yeni Emir İletim
+        Bu endpoint, kullanıcı hisse senedi emir iletimi işlemleri için kullanılmaktadır.
+        Endpoint: /Stock/NewStockOrder
+        İstek Değişkenleri:
+        "code": Hisse senedi sembolü. Örneğin: "THYAO"
+        "buySell": İşlem yönü. Aşağıdaki değerlerden biri girilmelidir: "Alis", "Satis", "AcigaSatis".
+        "orderType": Emir tipi. Aşağıdaki değerlerden biri girilmelidir: "LMT", "PYS", "PKP", "MLM", "MPY".
+        "session": Emir geçerlilik/seans tipi. Aşağıdaki değerlerden biri girilmelidir: "Gunluk", "KalaniIptalEt", "IptalEdileneKadarGecerli", "TarihliEmir", "GerceklesmezseIptalEt", "DengeleyiciEmir", "KapanisSeansi".
+        "quantity": Emir adedi. Sayısal değer girilmelidir.
+        "price": Emir fiyatı. Sayısal değer girilmelidir. Piyasa emir tiplerinde 0 gönderilebilir.
+        "subMarket": Alt pazar/risk bildirim tipi. Opsiyoneldir. Aşağıdaki değerlerden biri girilebilir: "AltPazar", "YipRiskBildirimFormu", "PoipRiskBildirimFormu".
+        """
+        payload: Dict[str, Any] = {
+            "code": code,
+            "buySell": buy_sell,
+            "orderType": order_type,
+            "session": session,
             "quantity": quantity,
-            "direction": direction,
             "price": price,
-            "orderMethod": order_method,
-            "orderDuration": order_duration,
         }
+        if sub_market:
+            payload["subMarket"] = sub_market
+        return self._post("Stock/NewStockOrder", payload)
 
-        if market_risk_approval is not None:
-            payload["marketRiskApproval"] = market_risk_approval
-
-        return self._post("Stock/StockCreateOrder", payload)
-
-    def get_stock_replace_order(
-        self,
-        portfolio_number: int,
-        order_ref: str,
-        price:  float,
-        quantity: int
-    ) -> Dict[str, Any]:
-        payload= {
-            "portfolioNumber": portfolio_number,
-            "orderRef": order_ref,
-            "price" : price,
-            "quantity": quantity
-        }
-        
-        return self._post("Stock/StockReplaceOrder", payload)
-                          
-    def get_stock_delete_order(self, portfolio_number: int, order_ref: str) -> Dict[str, Any]:
-        return self._post("Stock/StockDeleteOrder", {
-            "portfolioNumber": portfolio_number,
-            "orderRef":        order_ref
+    def update_stock_order(self, order_no: int, price: float) -> Dict[str, Any]:
+        """
+        Hisse Senedi Emir Düzeltme
+        Bu endpoint, kullanıcı hisse senedi emir düzeltme işlemleri için kullanılmaktadır.
+        Endpoint: /Stock/UpdateStockOrder
+        İstek Değişkenleri:
+        "orderNo": Düzenlenecek emrin numarası. Integer değer girilmelidir.
+        "price": Emirin yeni fiyat bilgisi. Double değer girilmelidir.
+        """
+        return self._post("Stock/UpdateStockOrder", {
+            "orderNo": order_no,
+            "price": price
         })
 
-    def get_stock_order_list(
-        self,
-        portfolio_number: int,
-        order_status: Optional[str],
-        order_direction: Optional[str],
-        order_method: Optional[str],
-        order_duration: Optional[str],
-        equity_code: Optional[str],
-        equity_type: Optional[str],
-        page_number: int,
-        descending_order: Optional[bool]
-    ) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
-            "portfolioNumber":  portfolio_number,
-            "pageNumber":       page_number
-        }
-        
-        if order_status is not None:
-            payload["orderStatus"] = order_status
+    def cancel_stock_order(self, order_no: int) -> Dict[str, Any]:
+        """
+        Hisse Senedi Emir Silme
+        Bu endpoint, kullanıcı hisse senedi emir silme işlemleri için kullanılmaktadır.
+        Endpoint: /Stock/CancelStockOrder
+        İstek Değişkenleri:
+        "orderNo": Silinecek emrin numarası. Integer değer girilmelidir.
+        """
+        return self._post("Stock/CancelStockOrder", {"orderNo": order_no})
 
-        if order_direction is not None:
-            payload["orderDirection"] = order_direction
+    def get_stock_orders(self) -> Dict[str, Any]:
+        """
+        Hisse Senedi Emirleri
+        Bu endpoint, kullanıcı günlük hisse senedi emirlerini görüntüleme işlemleri için kullanılmaktadır.
+        Endpoint: /Stock/StockOrders
+        Bu endpoint için request body gönderilmez.
+        """
+        return self._post("Stock/StockOrders", {})
 
-        if order_method is not None:
-            payload["orderMethod"] = order_method
-
-        if order_duration is not None:
-            payload["orderDuration"] = order_duration
-
-        if equity_type is not None:
-            payload["equityType"] = equity_type
-            
-        if equity_code is not None:
-            payload["equityCode"] = equity_code
-
-        if descending_order is not None:
-            payload["descendingOrder"] = descending_order
-            
-        return self._post("Stock/StockOrderList", payload)
-
-    def get_stock_positions(
-        self,
-        portfolio_number: int,
-        equity_code: Optional[str],
-        equity_type: Optional[str],
-        without_depot: Optional[bool] = None,
-        without_t1_qty: Optional[bool] = None
-    ) -> Dict[str, Any]:
-        
-        payload: Dict[str, Any] = {
-            "portfolioNumber": portfolio_number
-        }           
-        if equity_code is not None:
-            payload["equityCode"] = equity_code
-
-        if equity_type is not None:
-            payload["equityType"] = equity_type   
-
-        if without_depot is not None:
-            payload["withOutDepot"] = without_depot
-            
-        if without_t1_qty is not None:
-            payload["withOutT1Qty"] = without_t1_qty
-            
-        return self._post("Stock/StockPositions", payload)
+    def get_stock_order_detail(self, order_no: int) -> Dict[str, Any]:
+        """
+        Hisse Senedi Emir Detayı
+        Bu endpoint, kullanıcı hisse senedi emir detaylarını görüntüleme işlemleri için kullanılmaktadır.
+        Endpoint: /Stock/StockOrderDetail
+        İstek Değişkenleri:
+        "orderNo": Detayı görüntülenecek emrin numarası. Integer değer girilmelidir.
+        """
+        return self._post("Stock/StockOrderDetail", {"orderNo": order_no})
 
     # ————— Future Endpoints —————
-    def get_future_create_order(
+    def new_future_order(
         self,
-        portfolio_number: int,
-        contract_code: str,
-        direction: str,
-        price: float,
-        quantity: int,
-        order_method: str,
-        order_duration: str,
-        after_hour_session_valid: bool,
-        expiration_date: str
-    ) -> Dict[str, Any]:
-        payload = {
-            "portfolioNumber":       portfolio_number,
-            "contractCode":          contract_code,
-            "direction":             direction,
-            "price":                 price,
-            "quantity":              quantity,
-            "orderMethod":           order_method,
-            "orderDuration":         order_duration,
-            "afterHourSessionValid": after_hour_session_valid,
-            "expirationDate":        expiration_date
-        }
-        return self._post("Future/FutureCreateOrder", payload)
-
-    def get_future_replace_order(
-        self,
-        portfolio_number: int,
-        order_ref: str,
-        quantity: int,
-        price: float,
+        code: str,
+        buy_sell: str,
         order_type: str,
-        expiration_date: str
+        session: str,
+        quantity: int,
+        price: float
     ) -> Dict[str, Any]:
-        return self._post("Future/FutureReplaceOrder", {
-            "portfolioNumber": portfolio_number,
-            "orderRef":        order_ref,
-            "quantity":        quantity,
-            "price":           price,
-            "orderType":       order_type,
-            "expirationDate":  expiration_date
+        """
+        Viop Emir İletim
+        Bu endpoint, kullanıcı VİOP emir iletimi işlemleri için kullanılmaktadır.
+        Endpoint: /Future/NewFutureOrder
+        İstek Değişkenleri:
+        "code": VİOP sözleşme kodu. String değer girilmelidir.
+        "buySell": İşlem yönü. Aşağıdaki değerlerden biri girilmelidir: "Uzun", "Kisa".
+        "orderType": Emir tipi. Aşağıdaki değerlerden biri girilmelidir: "LMT", "PYS", "PKP", "MLM", "MPY".
+        "session": Emir geçerlilik/seans tipi. Aşağıdaki değerlerden biri girilmelidir: "Gunluk", "KalaniIptalEt", "IptalEdileneKadarGecerli", "TarihliEmir", "GerceklesmezseIptalEt", "DengeleyiciEmir", "KapanisSeansi".
+        "quantity": Emir adedi. Integer değer girilmelidir.
+        "price": Emir fiyatı. Double değer girilmelidir. Piyasa emir tiplerinde 0 gönderilebilir.
+        """
+        return self._post("Future/NewFutureOrder", {
+            "code": code,
+            "buySell": buy_sell,
+            "orderType": order_type,
+            "session": session,
+            "quantity": quantity,
+            "price": price,
         })
 
-    def get_future_delete_order(self, portfolio_number: int, order_ref: str) -> Dict[str, Any]:
-        return self._post("Future/FutureDeleteOrder", {
-            "portfolioNumber": portfolio_number,
-            "orderRef":        order_ref
+    def update_future_order(self, order_no: int, price: float) -> Dict[str, Any]:
+        """
+        Viop Emir Düzeltme
+        Bu endpoint, kullanıcı viop emir düzeltme işlemleri için kullanılmaktadır.
+        Endpoint: /Future/UpdateFutureOrder
+        İstek Değişkenleri:
+        "orderNo": Düzenlenecek emrin numarası. Integer değer girilmelidir.
+        "price": Emirin yeni fiyat bilgisi. Double değer girilmelidir.
+        """
+        return self._post("Future/UpdateFutureOrder", {
+            "orderNo": order_no,
+            "price": price
         })
 
-    def get_future_order_list(
+    def cancel_future_order(self, order_no: int) -> Dict[str, Any]:
+        """
+        Viop Emir Silme
+        Bu endpoint, kullanıcı hisse senedi emir silme işlemleri için kullanılmaktadır.
+        Endpoint: /Future/CancelFutureOrder
+        İstek Değişkenleri:
+        "orderNo": Silinecek emrin numarası. Integer değer girilmelidir.
+        """
+        return self._post("Future/CancelFutureOrder", {"orderNo": order_no})
+
+    def get_future_orders(self) -> Dict[str, Any]:
+        """
+        Viop Emirleri
+        Bu endpoint, kullanıcı günlük hisse senedi emirlerini görüntüleme işlemleri için kullanılmaktadır.
+        Endpoint: /Future/FutureOrders
+        Bu endpoint için request body gönderilmez.
+        """
+        return self._post("Future/FutureOrders", {})
+
+    def get_future_order_detail(self, order_no: int) -> Dict[str, Any]:
+        """
+        Viop Emir Detayı
+        Bu endpoint, kullanıcı viop emir detaylarını görüntüleme işlemleri için kullanılmaktadır.
+        Endpoint: /Future/FutureOrderDetail
+        İstek Değişkenleri:
+        "orderNo": Detayı görüntülenecek emrin numarası. Integer değer girilmelidir.
+        """
+        return self._post("Future/FutureOrderDetail", {"orderNo": order_no})
+
+    # â€”â€”â€”â€”â€” Fund Endpoints â€”â€”â€”â€”â€”
+    def get_available_fund_list(self) -> Dict[str, Any]:
+        """
+        İşlem Yapılabilir Fon Listesi
+        Bu endpoint, işlem yapılabilen TEFAS fonlarını görüntülemek için kullanılmaktadır.
+        Endpoint: /Fund/AvaiableFundList
+        Bu endpoint için request body gönderilmez.
+        """
+        return self._post("Fund/AvaiableFundList", {})
+
+    def get_fund_orders(self) -> Dict[str, Any]:
+        """
+        Fon Emirleri
+        Bu endpoint, kullanıcı günlük hisse senedi emirlerini görüntüleme işlemleri için kullanılmaktadır.
+        Endpoint: /Stock/StockOrders
+        Bu endpoint için request body gönderilmez.
+        """
+        return self._post("Fund/FundOrders", {})
+
+    def new_fund_order(
         self,
-        portfolio_number: int,
-        order_validity_date: Optional[str],
-        contract_code: Optional[str],
-        contract_type: Optional[str],
-        long_short: Optional[str],
-        pending_orders: Optional[bool],
-        untransmitted_orders: Optional[bool],
-        partially_executed_orders: Optional[bool],
-        cancelled_orders: Optional[bool],
-        after_hour_session_valid: Optional[bool]
+        fund_id: int,
+        buy_sell: str,
+        quantity: float,
+        price: float
     ) -> Dict[str, Any]:
-        return self._post("Future/FutureOrderList", {
-            "portfolioNumber":         portfolio_number,
-            "orderValidityDate":       order_validity_date,
-            "contractCode":            contract_code,
-            "contractType":            contract_type,
-            "longShort":               long_short,
-            "pendingOrders":           pending_orders,
-            "untransmittedOrders":     untransmitted_orders,
-            "partiallyExecutedOrders": partially_executed_orders,
-            "cancelledOrders":         cancelled_orders,
-            "afterHourSessionValid":   after_hour_session_valid
+        """
+        Fon Emir İletim
+        Bu endpoint, kullanıcı fon emir iletimi işlemleri için kullanılmaktadır.
+        Endpoint: /Fund/NewFundOrder
+        İstek Değişkenleri:
+        "fundId": İşlem yapılacak fonun ID bilgisidir. Integer değer girilmelidir.
+        "buySell": İşlem yönü. Aşağıdaki değerlerden biri girilmelidir: "Alis", "Satis".
+        "quantity": Emir adedi/miktarı. Double değer girilmelidir.
+        "price": Emir fiyatı/tutarı. Double değer girilmelidir.
+        """
+        return self._post("Fund/NewFundOrder", {
+            "fundId": fund_id,
+            "buySell": buy_sell,
+            "quantity": quantity,
+            "price": price
         })
 
-    def get_future_positions(self, portfolio_number: int) -> Dict[str, Any]:
-        return self._post("Future/FuturePositions", {
-            "portfolioNumber": portfolio_number
-        })
+    def cancel_fund_order(self, order_no: int) -> Dict[str, Any]:
+        """
+        Fon Emir Silme
+        Bu endpoint, kullanıcı fon emir silme işlemleri için kullanılmaktadır.
+        Endpoint: /Fund/CancelFundOrder
+        İstek Değişkenleri:
+        "orderNo": Silinecek emrin numarası. Integer değer girilmelidir.
+        """
+        return self._post("Fund/CancelFundOrder", {"orderNo": order_no})
               
 class WebSocket:
     """
@@ -525,10 +619,10 @@ class WebSocket:
         sig = self._make_signature(path, '', ts)
 
         headers = {
-            'X-ClientKey': self._client_key,
-            'Authorization': self._jwt_token,
-            'X-Signature': sig,
+            'X-ApiKey': self._client_key,
             'X-Timestamp': ts,
+            'X-Signature': sig,
+            'Authorization': self._jwt_token,
         }
 
         # Ara sertifikayı içeren dosyanın yolu

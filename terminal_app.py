@@ -23,10 +23,10 @@ from rich.table import Table
 # ── Yerel modüller ───────────────────────────────────────────────────────
 from api_client import API, WebSocket
 from config import (
-    API_URL, API_KEY, API_SECRET, USERNAME, PASSWORD,
+    API_URL, CLIENT_KEY, CLIENT_SECRET, USERNAME, PASSWORD,
     DIRECTION_MAP, ORDER_METHOD_MAP, ORDER_DURATION_MAP,
-    ORDER_STATUS_MAP, EQUITY_TYPE_MAP,
-    VIOP_LONG_SHORT_MAP, VIOP_CONTRACT_TYPE_MAP,
+    VIOP_LONG_SHORT_MAP,
+    FUND_DIRECTION_MAP,
     WEBSOCKET_SUBSCRIBE, WEBSOCKET_UNSUBSCRIBE
 )
 
@@ -79,8 +79,8 @@ def show_api_info() -> None:
     t.add_column(style="label", justify="right")
     t.add_column(style="value")
     t.add_row("API URL:",   f"[highlight]{API_URL}[/]")
-    t.add_row("API Key:",   API_KEY)
-    t.add_row("Secret:",    API_SECRET)
+    t.add_row("API Key:",   CLIENT_KEY)
+    t.add_row("Secret:",    CLIENT_SECRET)
     t.add_row("Kullanıcı:", USERNAME or "-")
     t.add_row("Şifre:",     PASSWORD or "-")
     console.print(Panel(t, title="[title]API Bilgileri[/title]",
@@ -119,8 +119,8 @@ def start_websocket() -> None:
     # 2) WS istemcisi
     ws = WebSocket(
         api_url            = API_URL,
-        api_key            = API_KEY,
-        secret_key         = API_SECRET,
+        api_key            = CLIENT_KEY,
+        secret_key         = CLIENT_SECRET,
         jwt_token          = api._jwt_token,        # type: ignore[attr-defined]
         heartbeat_interval = 300,
         verbose            = False
@@ -150,15 +150,36 @@ def graceful_shutdown():
 # ════════════════════════════════════════════════════════════════════════
 # Giriş (REST login)
 # ------------------------------------------------------------------------
+def _response_value(resp: dict, key: str):
+    return resp.get(key) if key in resp else resp.get(key[:1].upper() + key[1:])
+
+def _is_success_response(resp: dict) -> bool:
+    return bool(_response_value(resp, "isSuccess"))
+
+def _message_text(resp: dict) -> str:
+    parts = [
+        _response_value(resp, "message"),
+        _response_value(resp, "messageCode"),
+        _response_value(resp, "errorCode"),
+    ]
+    errors = _response_value(resp, "errors") or []
+    if isinstance(errors, list):
+        parts.extend(errors)
+    return " ".join(str(part) for part in parts if part).lower()
+
+def _can_continue_to_sms(resp: dict) -> bool:
+    text = _message_text(resp)
+    return "sms" in text and ("hatal" in text or "eksik" in text)
+
 def rich_login():
     global api
-    if not all([API_URL, API_KEY, API_SECRET]):
+    if not all([API_URL, CLIENT_KEY, CLIENT_SECRET]):
         console.print("[error]config.py’de API_URL / KEY / SECRET eksik.[/error]")
         sys.exit(1)
 
     api = API.get_api(api_url=cast(str, API_URL),
-                      api_key=cast(str, API_KEY),
-                      secret_key=cast(str, API_SECRET),
+                      api_key=cast(str, CLIENT_KEY),
+                      secret_key=cast(str, CLIENT_SECRET),
                       verbose=True)
 
     if not getattr(api, "_jwt_token", None):
@@ -168,22 +189,23 @@ def rich_login():
             console.print("[error]OTP isteği hatası:[/error]", e)
             sys.exit(1)
 
-        token = otp.get("data", {}).get("token")
-        if not token:
-            console.print("[error]OTP yanıtında token yok.[/error]")
+        if not _is_success_response(otp) and not _can_continue_to_sms(otp):
+            console.print("[error]OTP istegi basarisiz.[/error]", otp)
             sys.exit()
 
         console.print("\n[prompt]SMS kodu:[/prompt] ", end="")
         code = input().strip()
 
         try:
-            login_resp = api.login(token, code)
+            login_resp = api.login(code, user_name=USERNAME or "", password=PASSWORD or "")
         except RequestException as e:
             console.print("[error]Giriş hatası:[/error]", e)
             sys.exit(1)
 
-        if "data" not in login_resp:
-            console.print("[error]Beklenmeyen login yanıtı[/error]", login_resp)
+        data = _response_value(login_resp, "data") or {}
+        access_token = data.get("accessToken") or data.get("AccessToken")
+        if not access_token:
+            console.print("[error]Giris basarisiz.[/error]", login_resp)
             sys.exit(1)
 
         console.print("[success]✅ Giriş başarılı.[/success]")
@@ -260,271 +282,191 @@ def ask_enum_choice(prompt: str, choice_map: dict[int, str], required=False) -> 
 # ——— Portfolio Endpoints ———
 def get_subaccounts():
     if api:
-        resp = api.get_subaccounts()
-        json_panel(resp, title="Alt Hesaplar")
+        resp = api.get_portfolio_stock()
+        json_panel(resp, title="Hisse Senedi Portföyü ve Nakit Akışı")
 
 def get_account_summary():
-    port = ask_optional_int("Portfolio Number", required=True)
-    if port is None:
-        return
-    assert port is not None
     if api:
-        resp = api.get_account_summary(portfolio_number=port)
-        json_panel(resp, title="get_account_summary")
+        resp = api.get_portfolio_future()
+        json_panel(resp, title="Viop Portföyü ve Viop Nakit Akışı")
 
 def get_cash_assets():
-    port = ask_optional_int("Portfolio Number", required=True)
-    if port is None:
-        return
-    assert port is not None
     if api:
-        resp = api.get_cash_assets(portfolio_number=port)
-        json_panel(resp, title="get_cash_assets")
+        resp = api.get_portfolio_fund()
+        json_panel(resp, title="Fon Portföyü ve Fon Nakit Akışı")
 
 def get_cash_balance():
-    port = ask_optional_int("Portfolio Number", required=True)
-    if port is None:
-        return
-    assert port is not None
     if api:
-        resp = api.get_cash_balance(portfolio_number=port)
-        json_panel(resp, title="get_cash_balance")
+        resp = api.get_portfolio_stock()
+        json_panel(resp, title="Hisse Senedi Portföyü ve Nakit Akışı")
 
 def get_account_overall():
-    port = ask_optional_int("Portfolio Number", required=True)
-    if port is None:
-        return
-    assert port is not None
     if api:
-        resp = api.get_account_overall(portfolio_number=port)
-        json_panel(resp, title="get_account_overall")
+        resp = api.get_portfolio_future()
+        json_panel(resp, title="Viop Portföyü ve Viop Nakit Akışı")
 
 # ——— Stock Endpoints ———
 def get_stock_create_order():
-    port      = ask_optional_int("Portfolio Number", required=True)
-    symbol    = ask_optional_str("Equity Code", required=True)
-    qty       = ask_optional_int("Quantity", required=True)
-    direction = ask_enum_choice("Direction", DIRECTION_MAP, required=True)
-    price     = ask_optional_float("Price", required=True)
-    method    = ask_enum_choice("Order Method", ORDER_METHOD_MAP, required=True)
-    duration  = ask_enum_choice("Order Duration", ORDER_DURATION_MAP, required=True)
-    mra       = ask_optional_bool("Market Risk Approval?")
+    symbol = ask_optional_str("Code", required=True)
+    direction = ask_enum_choice("Buy/Sell", DIRECTION_MAP, required=True)
+    method = ask_enum_choice("Order Type", ORDER_METHOD_MAP, required=True)
+    duration = ask_enum_choice("Session", ORDER_DURATION_MAP, required=True)
+    qty = ask_optional_float("Quantity", required=True)
+    price = ask_optional_float("Price", required=True)
+    sub_market = ask_optional_str("Sub Market")
 
-    if port is None or symbol is None or qty is None or direction is None or price is None or method is None or duration is None:
+    if symbol is None or qty is None or direction is None or price is None or method is None or duration is None:
         return
-    assert port is not None and symbol is not None and qty is not None and direction is not None and price is not None and method is not None and duration is not None
 
     if api:
-        resp = api.get_stock_create_order(
-            portfolio_number=port,
-            equity_code=symbol,
+        resp = api.new_stock_order(
+            code=symbol,
+            buy_sell=direction,
+            order_type=method,
+            session=duration,
             quantity=qty,
-            direction=direction,
             price=price,
-            order_method=method,
-            order_duration=duration,
-            market_risk_approval=mra
+            sub_market=sub_market
         )
-        json_panel(resp, title="get_stock_create_order")
+        json_panel(resp, title="Hisse Senedi Yeni Emir İletim")
 
 def get_stock_replace_order():
-    port  = ask_optional_int("Portfolio Number", required=True)
-    ref   = ask_optional_str("Order Ref", required=True)
+    order_no = ask_optional_int("Order No", required=True)
     price = ask_optional_float("New Price", required=True)
-    qty   = ask_optional_int("New Quantity", required=True)
 
-    if port is None or ref is None or price is None or qty is None:
+    if order_no is None or price is None:
         return
-    assert port is not None and ref is not None and price is not None and qty is not None
 
     if api:
-        resp = api.get_stock_replace_order(
-            portfolio_number=port,
-            order_ref=ref,
-            price=price,
-            quantity=qty
-        )
-        json_panel(resp, title="get_stock_replace_order")
+        resp = api.update_stock_order(order_no=order_no, price=price)
+        json_panel(resp, title="Hisse Senedi Emir Düzeltme")
 
 def get_stock_delete_order():
-    port = ask_optional_int("Portfolio Number", required=True)
-    ref  = ask_optional_str("Order Ref to delete", required=True)
-    if port is None or ref is None:
+    order_no = ask_optional_int("Order No", required=True)
+    if order_no is None:
         return
-    assert port is not None and ref is not None
     if api:
-        resp = api.get_stock_delete_order(
-            portfolio_number=port,
-            order_ref=ref
-        )
-        json_panel(resp, title="get_stock_delete_order")
+        resp = api.cancel_stock_order(order_no=order_no)
+        json_panel(resp, title="Hisse Senedi Emir Silme")
 
 def get_stock_order_list():
-    port             = ask_optional_int("Portfolio Number", required=True)
-    order_status     = ask_enum_choice("Order Status", ORDER_STATUS_MAP)
-    order_direction  = ask_enum_choice("Order Direction", DIRECTION_MAP)
-    order_method     = ask_enum_choice("Order Method", ORDER_METHOD_MAP)
-    order_duration   = ask_enum_choice("Order Duration", ORDER_DURATION_MAP)
-    equity_code      = ask_optional_str("Equity Code")
-    equity_type      = ask_enum_choice("Equity Type", EQUITY_TYPE_MAP)
-    page_number      = ask_optional_int("Page Number", required=True)
-    descending_order = ask_optional_bool("Descending Order?")
+    if api:
+        resp = api.get_stock_orders()
+        json_panel(resp, title="Hisse Senedi Emirleri")
 
-    if (port is None or page_number is None):
-        console.print("❌ Zorumlu alanlar doldurulmali.")
+def get_stock_order_detail():
+    order_no = ask_optional_int("Order No", required=True)
+    if order_no is None:
         return
-    assert (port is not None and page_number is not None)
 
     if api:
-        resp = api.get_stock_order_list(
-            portfolio_number=port,
-            order_status=order_status,
-            order_direction=order_direction,
-            order_method=order_method,
-            order_duration=order_duration,
-            equity_code=equity_code,
-            equity_type=equity_type,
-            page_number=page_number,
-            descending_order=descending_order
-        )
-        json_panel(resp, title="get_stock_order_list")
+        resp = api.get_stock_order_detail(order_no=order_no)
+        json_panel(resp, title="Hisse Senedi Emir Detayı")
 
 def get_stock_positions():
-    port         = ask_optional_int("Portfolio Number", required=True)
-    equity_code  = ask_optional_str("Equity Code")
-    equity_type  = ask_enum_choice("Equity Type", EQUITY_TYPE_MAP)
-    without_dep  = ask_optional_bool("Without Depot?")
-    without_t1   = ask_optional_bool("Without T+1 Qty?")
-
-    if (port is None):
-        console.print("❌ Zorunlu alanlar doldurulmali.")
-        return
-    assert (port is not None)
-
     if api:
-        resp = api.get_stock_positions(
-            portfolio_number=port,
-            equity_code=equity_code,
-            equity_type=equity_type,
-            without_depot=without_dep,
-            without_t1_qty=without_t1
-        )
-        json_panel(resp, title="get_stock_positions")
+        resp = api.get_portfolio_stock()
+        json_panel(resp, title="Hisse Senedi Portföyü ve Nakit Akışı")
 
 # ——— Future Endpoints ———
 def get_future_create_order():
-    port      = ask_optional_int("Portfolio Number", required=True)
-    contract  = ask_optional_str("Contract Code", required=True)
-    direction = ask_enum_choice("Direction", VIOP_LONG_SHORT_MAP, required=True)
-    price     = ask_optional_float("Price", required=True)
-    qty       = ask_optional_int("Quantity", required=True)
-    method    = ask_enum_choice("Order Method", ORDER_METHOD_MAP, required=True)
-    duration  = ask_enum_choice("Order Duration", ORDER_DURATION_MAP, required=True)
-    ahs       = ask_optional_bool("After Hour Valid?", required=True)
-    exp_date  = ask_optional_date("Expiration Date", required=True)
+    contract = ask_optional_str("Code", required=True)
+    direction = ask_enum_choice("Buy/Sell", VIOP_LONG_SHORT_MAP, required=True)
+    method = ask_enum_choice("Order Type", ORDER_METHOD_MAP, required=True)
+    duration = ask_enum_choice("Session", ORDER_DURATION_MAP, required=True)
+    qty = ask_optional_int("Quantity", required=True)
+    price = ask_optional_float("Price", required=True)
 
-    if (port is None or contract is None or direction is None or price is None or
-            qty is None or method is None or duration is None or ahs is None or
-            exp_date is None):
+    if (contract is None or direction is None or price is None or
+            qty is None or method is None or duration is None):
         return
-    assert (port is not None and contract is not None and direction is not None and
-            price is not None and qty is not None and method is not None and
-            duration is not None and ahs is not None and exp_date is not None)
-
     if api:
-        resp = api.get_future_create_order(
-            portfolio_number=port,
-            contract_code=contract,
-            direction=direction,
-            price=price,
+        resp = api.new_future_order(
+            code=contract,
+            buy_sell=direction,
+            order_type=method,
+            session=duration,
             quantity=qty,
-            order_method=method,
-            order_duration=duration,
-            after_hour_session_valid=ahs,
-            expiration_date=exp_date
+            price=price
         )
-        json_panel(resp, title="get_future_create_order")
+        json_panel(resp, title="Viop Emir İletim")
 
 def get_future_replace_order():
-    port     = ask_optional_int("Portfolio Number", required=True)
-    ref      = ask_optional_str("Order Ref", required=True)
-    qty      = ask_optional_int("New Quantity", required=True)
-    price    = ask_optional_float("New Price", required=True)
-    otype    = ask_enum_choice("Order Type", ORDER_DURATION_MAP, required=True)
-    exp_date = ask_optional_date("Expiration Date", required=True)
+    order_no = ask_optional_int("Order No", required=True)
+    price = ask_optional_float("New Price", required=True)
 
-    if port is None or ref is None or qty is None or price is None or otype is None or exp_date is None:
+    if order_no is None or price is None:
         return
-    assert port is not None and ref is not None and qty is not None and price is not None and otype is not None and exp_date is not None
 
     if api:
-        resp = api.get_future_replace_order(
-            portfolio_number=port,
-            order_ref=ref,
-            quantity=qty,
-            price=price,
-            order_type=otype,
-            expiration_date=exp_date
-        )
-        json_panel(resp, title="get_future_replace_order")
+        resp = api.update_future_order(order_no=order_no, price=price)
+        json_panel(resp, title="Viop Emir Düzeltme")
 
 def get_future_delete_order():
-    port = ask_optional_int("Portfolio Number", required=True)
-    ref  = ask_optional_str("Order Ref to delete", required=True)
+    order_no = ask_optional_int("Order No", required=True)
 
-    if port is None or ref is None:
+    if order_no is None:
         return
-    assert port is not None and ref is not None
 
     if api:
-        resp = api.get_future_delete_order(
-            portfolio_number=port,
-            order_ref=ref
-        )
-        json_panel(resp, title="get_future_delete_order")
+        resp = api.cancel_future_order(order_no=order_no)
+        json_panel(resp, title="Viop Emir Silme")
 
 def get_future_order_list():
-    port                      = ask_optional_int("Portfolio Number", required=True)
-    order_validity_date       = ask_optional_date("Order Validity Date")
-    contract_code             = ask_optional_str("Contract Code")
-    contract_type             = ask_enum_choice("Contract Type", VIOP_CONTRACT_TYPE_MAP)
-    long_short                = ask_enum_choice("Long/Short", VIOP_LONG_SHORT_MAP)
-    pending_orders            = ask_optional_bool("Pending Orders?")
-    untransmitted_orders      = ask_optional_bool("Untransmitted Orders?")
-    partially_executed_orders = ask_optional_bool("Partially Executed Orders?")
-    cancelled_orders          = ask_optional_bool("Cancelled Orders?")
-    after_hour_session_valid  = ask_optional_bool("After Hour Session Valid?")
+    if api:
+        resp = api.get_future_orders()
+        json_panel(resp, title="Viop Emirleri")
 
-    if (
-        port is None
-    ):
+def get_future_order_detail():
+    order_no = ask_optional_int("Order No", required=True)
+    if order_no is None:
         return
-    assert (
-        port is not None
-    )
 
     if api:
-        resp = api.get_future_order_list(
-            portfolio_number=port,
-            order_validity_date=order_validity_date,
-            contract_code=contract_code,
-            contract_type=contract_type,
-            long_short=long_short,
-            pending_orders=pending_orders,
-            untransmitted_orders=untransmitted_orders,
-            partially_executed_orders=partially_executed_orders,
-            cancelled_orders=cancelled_orders,
-            after_hour_session_valid=after_hour_session_valid
-        )
-        json_panel(resp, title="get_future_order_list")
+        resp = api.get_future_order_detail(order_no=order_no)
+        json_panel(resp, title="Viop Emir Detayı")
 
 def get_future_positions():
-    port = ask_optional_int("Portfolio Number", required=True)
-    if port is None:
-        return
     if api:
-        resp = api.get_future_positions(portfolio_number=port)
-        json_panel(resp, title="get_future_positions")
+        resp = api.get_portfolio_future()
+        json_panel(resp, title="Viop Portföyü ve Viop Nakit Akışı")
+
+def get_available_fund_list():
+    if api:
+        resp = api.get_available_fund_list()
+        json_panel(resp, title="İşlem Yapılabilir Fon Listesi")
+
+def get_fund_orders():
+    if api:
+        resp = api.get_fund_orders()
+        json_panel(resp, title="Fon Emirleri")
+
+def new_fund_order():
+    fund_id = ask_optional_int("Fund ID", required=True)
+    buy_sell = ask_enum_choice("Buy/Sell", FUND_DIRECTION_MAP, required=True)
+    quantity = ask_optional_float("Quantity", required=True)
+    price = ask_optional_float("Price", required=True)
+
+    if fund_id is None or buy_sell is None or quantity is None or price is None:
+        return
+
+    if api:
+        resp = api.new_fund_order(
+            fund_id=fund_id,
+            buy_sell=buy_sell,
+            quantity=quantity,
+            price=price
+        )
+        json_panel(resp, title="Fon Emir İletim")
+
+def cancel_fund_order():
+    order_no = ask_optional_int("Order No", required=True)
+    if order_no is None:
+        return
+
+    if api:
+        resp = api.cancel_fund_order(order_no=order_no)
+        json_panel(resp, title="Fon Emir Silme")
  
  # ════════════════════════════════════════════════════════════════════════
 
@@ -535,10 +477,11 @@ def get_future_positions():
 def main_menu():
     while True:
         ch = select_from_menu("Ana Menü", [
-            ("1", "Portfolio Endpoints Menüsü"),
-            ("2", "Stock Endpoints Menüsü"),
-            ("3", "Future Endpoints Menüsü"),
-            ("4", "WebSocket Abonelik Menüsü"),
+            ("1", "Portföy ve Nakit Akışı"),
+            ("2", "Pay Menüsü"),
+            ("3", "Viop Menüsü"),
+            ("4", "Fon Menüsü"),
+            ("5", "WebSocket Abonelikleri Menüsü"),
             ("*", "Çıkış"),
         ])
         if ch == "1":
@@ -548,6 +491,8 @@ def main_menu():
         elif ch == "3":
             future_menu()
         elif ch == "4":
+            fund_menu()
+        elif ch == "5":
             websocket_menu()
         elif ch == "*":
             console.print("[info]Çıkış yapılıyor…[/info]")
@@ -558,30 +503,26 @@ def main_menu():
 
 def portfolio_menu() -> None:
     while True:
-        choice = select_from_menu("Hesap Bilgisi Menüsü", [
-            ("1", "Alt Hesapları Görüntüle"),
-            ("2", "get_account_summary Bilgisi"),
-            ("3", "get_cash_assets Bilgisi"),
-            ("4", "get_cash_balance Bilgisi"),
-            ("5", "get_account_overall Bilgisi"),
-            ("0", "Ana Menü"),
+        choice = select_from_menu("Hesap Bilgisi Menusu", [
+            ("1", "Hisse Senedi Portföyü ve Nakit Akışı"),
+            ("2", "Viop Portföyü ve Viop Nakit Akışı"),
+            ("3", "Fon Portföyü ve Fon Nakit Akışı"),
+            ("0", "Ana Menu"),
         ])
         if choice == "0": return
         elif choice == "1": get_subaccounts()
         elif choice == "2": get_account_summary()
         elif choice == "3": get_cash_assets()
-        elif choice == "4": get_cash_balance()
-        elif choice == "5": get_account_overall()
-        else: console.print("[warning]Geçersiz seçim.[/warning]")
+        else: console.print("[warning]Gecersiz secim.[/warning]")
 
 def stock_menu() -> None:
     while True:
         choice = select_from_menu("Pay Emir Menüsü", [
-            ("1", "Emir Gönder"),
-            ("2", "Emir Düzelt"),
-            ("3", "Emir Sil"),
-            ("4", "Pay Emir Listesi"),
-            ("5", "Hisse Senedi Pozisyonları"),
+            ("1", "Hisse Senedi Yeni Emir İletim"),
+            ("2", "Hisse Senedi Emir Düzeltme"),
+            ("3", "Hisse Senedi Emir Silme"),
+            ("4", "Hisse Senedi Emirleri"),
+            ("5", "Hisse Senedi Emir Detayı"),
             ("0", "Ana Menü"),
         ])
         if choice == "0": return
@@ -589,17 +530,17 @@ def stock_menu() -> None:
         elif choice == "2": get_stock_replace_order()
         elif choice == "3": get_stock_delete_order()
         elif choice == "4": get_stock_order_list()
-        elif choice == "5": get_stock_positions()
+        elif choice == "5": get_stock_order_detail()
         else: console.print("[warning]Geçersiz seçim.[/warning]")
 
 def future_menu() -> None:
     while True:
         choice = select_from_menu("Vadeli Emir Menüsü", [
-            ("1", "Emir Gönder"),
-            ("2", "Emir Düzelt"),
-            ("3", "Emir Sil"),
-            ("4", "Vadeli Emir Listesi"),
-            ("5", "Pozisyonlar"),
+            ("1", "Viop Emir İletim"),
+            ("2", "Viop Emir Düzeltme"),
+            ("3", "Viop Emir Silme"),
+            ("4", "Viop Emirleri"),
+            ("5", "Viop Emir Detayı"),
             ("0", "Ana Menü"),
         ])
         if choice == "0": return
@@ -607,8 +548,24 @@ def future_menu() -> None:
         elif choice == "2": get_future_replace_order()
         elif choice == "3": get_future_delete_order()
         elif choice == "4": get_future_order_list()
-        elif choice == "5": get_future_positions()
+        elif choice == "5": get_future_order_detail()
         else: console.print("[warning]Geçersiz seçim.[/warning]")
+
+def fund_menu() -> None:
+    while True:
+        choice = select_from_menu("Fon Emir Menusu", [
+            ("1", "İşlem Yapılabilir Fon Listesi"),
+            ("2", "Fon Emirleri"),
+            ("3", "Fon Emir İletim"),
+            ("4", "Fon Emir Silme"),
+            ("0", "Ana Menu"),
+        ])
+        if choice == "0": return
+        elif choice == "1": get_available_fund_list()
+        elif choice == "2": get_fund_orders()
+        elif choice == "3": new_fund_order()
+        elif choice == "4": cancel_fund_order()
+        else: console.print("[warning]Gecersiz secim.[/warning]")
 
 def websocket_menu():
     start_websocket()

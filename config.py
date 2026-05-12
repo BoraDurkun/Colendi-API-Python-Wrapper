@@ -12,19 +12,17 @@ Uygulamanın temel konfigürasyon değerlerini içerir:
 # API URL ve WebSocket
 # ——————————————————————————————————————————————————————————————————————————————
 
-API_HOST   = "https://api.codyalgo.com"
+API_HOST   = "https://api-client.colendimenkul.com/"
 API_URL    = API_HOST
-API_WS_URL = "wss://api.codyalgo.com/ws"
-
 
 # ——————————————————————————————————————————————————————————————————————————————
 # Hesap Kimlik Bilgileri
 # ——————————————————————————————————————————————————————————————————————————————
 
-API_KEY    = ""
-API_SECRET = ""
-USERNAME   = ""
-PASSWORD   = ""
+CLIENT_KEY = "" # Sizinle mail olarak paylaşılan Client Key'i buraya yapıştırın.
+CLIENT_SECRET = "" # Sizinle mail olarak paylaşılan Client Secret'ı buraya yapıştırın.
+USERNAME = "" # Colendi Müşteri numaranızı buraya yapıştırın.
+PASSWORD = ""# Colendi hesabınızın şifresini buraya yapıştırın.
 
 # ——————————————————————————————————————————————————————————————————————————————
 # CLI Menüleri için Enum → String Haritaları
@@ -33,23 +31,28 @@ PASSWORD   = ""
 
 # Alış/Satış yönü seçimi
 DIRECTION_MAP = {
-    1: "BUY",
-    2: "SELL",
-    3: "SHORT",
+    1: "Alis",
+    2: "Satis",
+    3: "AcigaSatis",
 }
 
 # Emir türü seçimi
 ORDER_METHOD_MAP = {
-    1: "LIMIT",
-    2: "MARKET",
-    3: "MARKET_TO_LIMIT",
+    1: "LMT",
+    2: "PYS",
+    3: "PKP",
+    4: "MLM",
+    5: "MPY",
 }
 
 # Emir geçerlilik süresi seçimi
 ORDER_DURATION_MAP = {
-    1: "DAILY",
-    2: "FILL_AND_KILL",
-    3: "GOOD_TILL_CANCEL",
+    1: "Gunluk",
+    2: "KalaniIptalEt",
+    3: "IptalEdileneKadarGecerli",
+    4: "TarihliEmir",
+    5: "GerceklesmezseIptalEt",
+    6: "DengeleyiciEmir",
 }
 
 # Emir durumu seçimi
@@ -97,18 +100,21 @@ VIOP_CONTRACT_TYPE_MAP = {
 
 # VİOP pozisyon yönü
 VIOP_LONG_SHORT_MAP = {
-    1: "LONG",
-    2: "SHORT",
+    1: "Uzun",
+    2: "Kisa",
 }
 
-# Websocket Abonelik menüsü
+FUND_DIRECTION_MAP = {
+    1: "Alis",
+    2: "Satis",
+}
+
 WEBSOCKET_SUBSCRIBE = {
     1: "AddT",
-    2: "AddD",
-    3: "AddY",
+    2: "AddY",
+    3: "AddD",
 }
 
-# Websocket Abonelikten çıkma menüsü
 WEBSOCKET_UNSUBSCRIBE = {
     1: "RemoveT",
     2: "RemoveY",

@@ -7,7 +7,7 @@ Rich tabanlı terminal uygulaması:
 
 # ── Standart kütüphaneler ───────────────────────────────────────────────
 import os, sys, subprocess, time, json, asyncio, threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, cast
 
 # ── Üçüncü parti ────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ from api_client import API, WebSocket
 from config import (
     API_URL, CLIENT_KEY, CLIENT_SECRET, USERNAME, PASSWORD,
     DIRECTION_MAP, ORDER_METHOD_MAP, ORDER_DURATION_MAP,
+    ORDER_DURATION_DESCRIPTION_MAP, ORDER_METHOD_DESCRIPTION_MAP,
     VIOP_LONG_SHORT_MAP,
     FUND_DIRECTION_MAP,
     WEBSOCKET_SUBSCRIBE, WEBSOCKET_UNSUBSCRIBE
@@ -190,7 +191,7 @@ def rich_login():
             sys.exit(1)
 
         if not _is_success_response(otp) and not _can_continue_to_sms(otp):
-            console.print("[error]OTP istegi basarisiz.[/error]", otp)
+            console.print("[error]OTP isteği başarısız.[/error]", otp)
             sys.exit()
 
         console.print("\n[prompt]SMS kodu:[/prompt] ", end="")
@@ -205,7 +206,7 @@ def rich_login():
         data = _response_value(login_resp, "data") or {}
         access_token = data.get("accessToken") or data.get("AccessToken")
         if not access_token:
-            console.print("[error]Giris basarisiz.[/error]", login_resp)
+            console.print("[error]Giriş başarısız.[/error]", login_resp)
             sys.exit(1)
 
         console.print("[success]✅ Giriş başarılı.[/success]")
@@ -263,11 +264,47 @@ def ask_optional_date(prompt: str, required=False) -> Optional[str]:
         except ValueError:
             console.print("[error]Tarih formatı YYYY-MM-DD olmalı.[/error]")
 
-def ask_enum_choice(prompt: str, choice_map: dict[int, str], required=False) -> Optional[str]:
+def ask_relative_datetime(prompt: str, required=False) -> Optional[datetime]:
+    """Bugün / Dün gibi hazır seçenekler ya da elle tarih girişi sunar."""
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    options = {
+        1: ("Bugün", today),
+        2: ("Dün", today - timedelta(days=1)),
+        3: ("Tarih gir (YYYY-MM-DD)", None),
+    }
+    while True:
+        console.print(f"\n{prompt} seçenekleri:")
+        for k, (label, _) in options.items():
+            console.print(f" {k}) {label}")
+        sel = Prompt.ask(f"{prompt} seçiminiz" + (" (zorunlu)" if required else ""), default="").strip()
+        if not sel and not required:
+            return None
+        if sel.isdigit() and int(sel) in options:
+            label, value = options[int(sel)]
+            if value is not None:
+                return value
+            manual = ask_optional_date(prompt, required=True)
+            if manual is not None:
+                manual_dt = datetime.strptime(manual, "%Y-%m-%d")
+                if manual_dt > today:
+                    console.print("[error]Gelecek bir tarih seçilemez.[/error]")
+                    continue
+                return manual_dt
+        console.print("[error]Geçersiz seçim.[/error]")
+
+def ask_enum_choice(
+    prompt: str,
+    choice_map: dict[int, str],
+    required=False,
+    descriptions: Optional[dict[str, str]] = None,
+    show_value_with_description: bool = True
+) -> Optional[str]:
     while True:
         console.print(f"\n{prompt} seçenekleri:")
         for k, v in choice_map.items():
-            console.print(f" {k}) {v}")
+            description = descriptions.get(v) if descriptions else None
+            label = f"{v} - {description}" if description and show_value_with_description else (description or v)
+            console.print(f" {k}) {label}")
         sel = Prompt.ask(f"{prompt} seçiminiz" + (" (zorunlu)" if required else ""), default="").strip()
         if not sel and not required:
             return None
@@ -309,8 +346,19 @@ def get_account_overall():
 def get_stock_create_order():
     symbol = ask_optional_str("Code", required=True)
     direction = ask_enum_choice("Buy/Sell", DIRECTION_MAP, required=True)
-    method = ask_enum_choice("Order Type", ORDER_METHOD_MAP, required=True)
-    duration = ask_enum_choice("Session", ORDER_DURATION_MAP, required=True)
+    method = ask_enum_choice(
+        "Order Type",
+        ORDER_METHOD_MAP,
+        required=True,
+        descriptions=ORDER_METHOD_DESCRIPTION_MAP
+    )
+    duration = ask_enum_choice(
+        "Session",
+        ORDER_DURATION_MAP,
+        required=True,
+        descriptions=ORDER_DURATION_DESCRIPTION_MAP,
+        show_value_with_description=False
+    )
     qty = ask_optional_float("Quantity", required=True)
     price = ask_optional_float("Price", required=True)
     sub_market = ask_optional_str("Sub Market")
@@ -350,8 +398,9 @@ def get_stock_delete_order():
         json_panel(resp, title="Hisse Senedi Emir Silme")
 
 def get_stock_order_list():
+    start_date = ask_relative_datetime("Başlangıç tarihi")
     if api:
-        resp = api.get_stock_orders()
+        resp = api.get_stock_orders(start_date=start_date)
         json_panel(resp, title="Hisse Senedi Emirleri")
 
 def get_stock_order_detail():
@@ -372,7 +421,12 @@ def get_stock_positions():
 def get_future_create_order():
     contract = ask_optional_str("Code", required=True)
     direction = ask_enum_choice("Buy/Sell", VIOP_LONG_SHORT_MAP, required=True)
-    method = ask_enum_choice("Order Type", ORDER_METHOD_MAP, required=True)
+    method = ask_enum_choice(
+        "Order Type",
+        ORDER_METHOD_MAP,
+        required=True,
+        descriptions=ORDER_METHOD_DESCRIPTION_MAP
+    )
     duration = ask_enum_choice("Session", ORDER_DURATION_MAP, required=True)
     qty = ask_optional_int("Quantity", required=True)
     price = ask_optional_float("Price", required=True)
@@ -513,7 +567,7 @@ def portfolio_menu() -> None:
         elif choice == "1": get_subaccounts()
         elif choice == "2": get_account_summary()
         elif choice == "3": get_cash_assets()
-        else: console.print("[warning]Gecersiz secim.[/warning]")
+        else: console.print("[warning]Geçersiz seçim.[/warning]")
 
 def stock_menu() -> None:
     while True:
@@ -565,7 +619,7 @@ def fund_menu() -> None:
         elif choice == "2": get_fund_orders()
         elif choice == "3": new_fund_order()
         elif choice == "4": cancel_fund_order()
-        else: console.print("[warning]Gecersiz secim.[/warning]")
+        else: console.print("[warning]Geçersiz seçim.[/warning]")
 
 def websocket_menu():
     start_websocket()

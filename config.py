@@ -45,6 +45,14 @@ ORDER_METHOD_MAP = {
     5: "MPY",
 }
 
+ORDER_METHOD_DESCRIPTION_MAP = {
+    "LMT": "Limitli",
+    "PYS": "Piyasa",
+    "PKP": "Piyasa En Iyi Fiyatli",
+    "MLM": "MidPoint Limit Emir",
+    "MPY": "MidPoint Piyasa Fiyatli emir (Gonderilmez ise LMT kabul edilir)",
+}
+
 # Emir geçerlilik süresi seçimi
 ORDER_DURATION_MAP = {
     1: "Gunluk",
@@ -53,9 +61,19 @@ ORDER_DURATION_MAP = {
     4: "TarihliEmir",
     5: "GerceklesmezseIptalEt",
     6: "DengeleyiciEmir",
+    7: "KapanisSeansi",
 }
 
-# Emir durumu seçimi
+ORDER_DURATION_DESCRIPTION_MAP = {
+    "Gunluk": "GUN - Gunluk",
+    "KalaniIptalEt": "KIE - Kalani Iptal Et",
+    "IptalEdileneKadarGecerli": "IKG - Iptal Edilene Kadar Gecerli",
+    "TarihliEmir": "TAR - Tarihli Emir",
+    "GerceklesmezseIptalEt": "GIE - Gerceklesmezse Iptal Et",
+    "DengeleyiciEmir": "IMB - Dengeleyici Emir",
+    "KapanisSeansi": "KSN - Kapanis Seansi",
+}
+
 ORDER_STATUS_MAP = {
     1:  "NEW",
     2:  "NOT_SUBMITTED",
@@ -75,6 +93,16 @@ ORDER_STATUS_MAP = {
     16: "EXPIRED",
     17: "WAITING_FOR_CONDITION",
     18: "WAITING",
+}
+
+STOCK_ORDER_STATUS_CODE_MAP = {
+    "Y": "BIST'de",
+    "Z": "Sistemde",
+    "X": "Sistemde tahta kapali",
+    "G": "Gerceklesen",
+    "H": "Gun Iptal",
+    "T": "Iptal",
+    "R": "Red",
 }
 
 # Hisse senedi tipi seçimi
@@ -104,9 +132,27 @@ VIOP_LONG_SHORT_MAP = {
     2: "Kisa",
 }
 
+VIOP_ORDER_STATUS_CODE_MAP = {
+    "Y": "BIST'de",
+    "Z": "Sistemde",
+    "G": "Gerceklesen",
+    "H": "Gun Iptal",
+    "T": "Iptal",
+    "R": "Red",
+    "S": "Askida",
+    "K": "Risk Kontrolu",
+}
+
 FUND_DIRECTION_MAP = {
     1: "Alis",
     2: "Satis",
+}
+
+FUND_ORDER_STATUS_CODE_MAP = {
+    "ES": "Gerceklesmeyi Bekliyor",
+    "MK": "MKK Sisteminde",
+    "IP": "Iptal Edildi",
+    "OK": "Gerceklesti",
 }
 
 WEBSOCKET_SUBSCRIBE = {

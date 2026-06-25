@@ -5,6 +5,7 @@ import hmac
 import base64
 import json
 from typing import Any, Dict, Optional, Callable
+from datetime import datetime
 import requests
 
 import asyncio
@@ -13,6 +14,7 @@ import websockets
 import ssl
 import os
 import logging
+from urllib.parse import urlencode
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -29,7 +31,7 @@ logger = logging.getLogger("api_client")
 
 class API:
     """
-    Singleton HMAC‐imzali REST API istemcisi.
+    Singleton HMAC imzalı REST API istemcisi.
     """
     TOKEN_FILE = "api_settings.json"
     _instance: Optional["API"] = None
@@ -45,7 +47,7 @@ class API:
         verbose: bool = True
     ) -> "API":
         """
-        Tekil API nesnesini doner. İlk cagrida api_url, api_key, secret_key zorunludur.
+        Tekil API nesnesini döner. İlk çağrıda api_url, api_key, secret_key zorunludur.
         """
         with cls._lock:
             if cls._instance is None:
@@ -70,27 +72,27 @@ class API:
         self._client_key  = api_key.strip()
         self._secret_key  = secret_key.strip()
         self._last_req = 0.0
-        self.interval = 1 # İstekler arasinda kac saniye olsun
+        self.interval = 1 # İstekler arasında kaç saniye olsun
         
 
-        # --- Token yukleme ve gecerlilik kontrolu (evvelden ekledigimiz) ---
+        # --- Token yükleme ve geçerlilik kontrolü (evvelden eklediğimiz) ---
         self._jwt_token = self._load_saved_token()
         if self._jwt_token:
             if self.verbose:
-                logger.info(f"✅ Yuklendi: {self.TOKEN_FILE}")
+                logger.info(f"✅ Yüklendi: {self.TOKEN_FILE}")
             resp = self.get_portfolio_stock()
             stat = resp.get("statusCode", "status")
             
             if stat == 200:
                 if self.verbose:
-                    logger.info("✅ Kaydedilmis token gecerli.")
+                    logger.info("✅ Kaydedilmiş token geçerli.")
             else:
                 if self.verbose:
-                    logger.warning(f"❌ Kaydedilmis token gecersiz ({stat}), temizleniyor.")
+                    logger.warning(f"❌ Kaydedilmiş token geçersiz ({stat}), temizleniyor.")
                 self._jwt_token = ""
                 self._clear_saved_token()
 
-        # --- AUTO SESSION REFRESH baslat ---
+        # --- AUTO SESSION REFRESH başlat ---
         self._start_session_refresher()
 
     # ————— HELPERS —————
@@ -98,7 +100,7 @@ class API:
     def _start_session_refresher(self):
         """
         Arka planda daemon thread ile her 270 saniyede bir
-        PortfolioStock cagirip session'i yeniler.
+        PortfolioStock çağırıp session'ı yeniler.
         """
         thread = threading.Thread(target=self._session_refresher_loop, daemon=True)
         thread.start()
@@ -107,7 +109,7 @@ class API:
         while True:
             time.sleep(270) # 4.5 dakika bekle
             if not self._jwt_token:
-                # Henuz login olunmadiysa atla
+                # Henüz login olunmadıysa atla
                 continue
             try:
                 self.get_portfolio_stock()
@@ -117,22 +119,22 @@ class API:
                 if self.verbose:
                     logger.warning(f"❌ Session refresh failed: {e}")
 
-    # ——— Token helper’lari ———
+    # ——— Token helper'ları ———
     @classmethod
     def _load_saved_token(cls) -> str:
-        # Dosya yoksa olustur ve bos token dondur
+        # Dosya yoksa oluştur ve boş token döndür
         if not os.path.isfile(cls.TOKEN_FILE):
             with open(cls.TOKEN_FILE, "w", encoding="utf-8") as f:
                 json.dump({"accessToken": ""}, f, ensure_ascii=False)
             return ""
-        # Var olan dosyayi oku
+        # Var olan dosyayı oku
         try:
             with open(cls.TOKEN_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             return data.get("accessToken") or data.get("jwtToken", "")
         except Exception as e:
-            # Hata varsa dosyayi sifirla
-            logger.warning(f"Hata olustu: {e}. Token dosyasi sifirlaniyor.")
+            # Hata varsa dosyayı sıfırla
+            logger.warning(f"Hata oluştu: {e}. Token dosyası sıfırlanıyor.")
             with open(cls.TOKEN_FILE, "w", encoding="utf-8") as f:
                 json.dump({"accessToken": ""}, f, ensure_ascii=False)
             return ""
@@ -181,13 +183,14 @@ class API:
         require_auth: bool = True
     ) -> Dict[str, Any]:
         """
-        Tum POST istekleri bu metot uzerinden gider.
+        Tüm POST istekleri bu metot üzerinden gider.
         `require_auth=False` ise JWT header eklenmez.
         """
         path     = endpoint if endpoint.startswith("/") else f"/{endpoint}"
+        sign_path = path.split("?", 1)[0]
         ts       = self._timestamp()
         body_str = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
-        sig      = self._make_signature(path, body_str, ts)
+        sig      = self._make_signature(sign_path, body_str, ts)
 
         headers = {
             "X-ApiKey": self._client_key,
@@ -227,8 +230,8 @@ class API:
         require_auth: bool = True
     ) -> Dict[str, Any]:
         """
-        GET istekleri bu metot uzerinden gider.
-        Signature hesaplanirken body bos string olarak kullanilir.
+        GET istekleri bu metot üzerinden gider.
+        Signature hesaplanırken body boş string olarak kullanılır.
         """
         path = endpoint if endpoint.startswith("/") else f"/{endpoint}"
         ts = self._timestamp()
@@ -398,14 +401,24 @@ class API:
         """
         return self._post("Stock/CancelStockOrder", {"orderNo": order_no})
 
-    def get_stock_orders(self) -> Dict[str, Any]:
+    def get_stock_orders(
+        self,
+        start_date: Optional[datetime] = None,
+        *,
+        startDate: Optional[datetime] = None
+    ) -> Dict[str, Any]:
         """
         Hisse Senedi Emirleri
         Bu endpoint, kullanıcı günlük hisse senedi emirlerini görüntüleme işlemleri için kullanılmaktadır.
         Endpoint: /Stock/StockOrders
-        Bu endpoint için request body gönderilmez.
+        İstek Değişkenleri:
+        "startDate": Emirlerin listeleneceği başlangıç tarihi. datetime tipinde değer girilmelidir.
         """
-        return self._post("Stock/StockOrders", {})
+        selected_start_date = start_date if start_date is not None else startDate
+        endpoint = "Stock/StockOrders"
+        if selected_start_date is not None:
+            endpoint = f"{endpoint}?{urlencode({'startDate': selected_start_date.isoformat()})}"
+        return self._post(endpoint, {})
 
     def get_stock_order_detail(self, order_no: int) -> Dict[str, Any]:
         """
@@ -491,7 +504,7 @@ class API:
         """
         return self._post("Future/FutureOrderDetail", {"orderNo": order_no})
 
-    # â€”â€”â€”â€”â€” Fund Endpoints â€”â€”â€”â€”â€”
+    # ------------------- Fund Endpoints -------------------
     def get_available_fund_list(self) -> Dict[str, Any]:
         """
         İşlem Yapılabilir Fon Listesi
@@ -546,13 +559,13 @@ class API:
               
 class WebSocket:
     """
-    HMAC imzali WebSocket baglantisi saglayan ve periyodik 'heartbeat' mesaji
-    atan bir istemci sinifi.
+    HMAC imzalı WebSocket bağlantısı sağlayan ve periyodik 'heartbeat' mesajı
+    atan bir istemci sınıfı.
 
-    ozellikler:
-      - Baglanti acildiginda otomatik reconnect.
-      - Belirlenen aralikla ('heartbeat_interval') H tipi heartbeat gonderimi.
-      - Gelen mesajlari istersen on_message callback’ine, istersen verbose modda console'a yazdirma.
+    Özellikler:
+      - Bağlantı açıldığında otomatik reconnect.
+      - Belirlenen aralıkla ('heartbeat_interval') H tipi heartbeat gönderimi.
+      - Gelen mesajları istersen on_message callback'ine, istersen verbose modda console'a yazdırma.
     """
 
     def __init__(
@@ -566,14 +579,14 @@ class WebSocket:
     ):
         """
         Parametreler:
-          api_url           : REST API base URL (or. "https://api.example.com")
-          api_key           : X-ClientKey basligi icin kullanilacak anahtar
-          secret_key        : İmzalama icin HMAC secret
+          api_url           : REST API base URL (ör. "https://api.example.com")
+          api_key           : X-ClientKey başlığı için kullanılacak anahtar
+          secret_key        : İmzalama için HMAC secret
           jwt_token         : Yetkili JWT token (Bearer olmadan)
-          heartbeat_interval: Kac saniyede bir heartbeat atilacagi
-          verbose           : True ise loglama acik olur
+          heartbeat_interval: Kaç saniyede bir heartbeat atılacağı
+          verbose           : True ise loglama açık olur
         """
-        # HTTP → WebSocket URL donusumu (wss/ws)
+        # HTTP → WebSocket URL dönüşümü (wss/ws)
         self.ws_url = api_url.rstrip('/') \
             .replace('https://', 'wss://') \
             .replace('http://', 'ws://') + '/ws'
@@ -587,17 +600,17 @@ class WebSocket:
         # callback placeholder
         self.on_message: Optional[Callable[[str], None]] = None
 
-        # İc durum
+        # İç durum
         self._last_heartbeat = 0.0
         self._ws: Optional[WebSocketClientProtocol] = None
 
     def _timestamp(self) -> str:
-        """su anki Unix timestamp'ini saniye cinsinden string olarak doner."""
+        """Şu anki Unix timestamp'ini saniye cinsinden string olarak döner."""
         return str(int(time.time()))
 
     def _make_signature(self, path: str, body_str: str, timestamp: str) -> str:
         """
-        HMAC-SHA256 imzasi olusturur ve base64 ile kodlar.
+        HMAC-SHA256 imzası oluşturur ve base64 ile kodlar.
 
         İmza girdisi: "{client_key}|{path}|{body}|{timestamp}"
         """
@@ -611,8 +624,8 @@ class WebSocket:
 
     async def connect(self):
         """
-        WebSocket baglantisini baslatir, header'lari ekler ve
-        alici/gonderici dongulerini tetikler.
+        WebSocket bağlantısını başlatır, header'ları ekler ve
+        alıcı/gönderici döngülerini tetikler.
         """
         path = '/ws'
         ts = self._timestamp()
@@ -629,20 +642,20 @@ class WebSocket:
         ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = True
 
-        # Baglantiyi ac
+        # Bağlantıyı aç
         self._ws = await websockets.connect(self.ws_url, ssl=ssl_context, additional_headers=headers)
         if self.verbose:
-            logger.info(f"✅ WebSocket baglantisi kuruldu: {self.ws_url}")
-        # Gelen mesajlari dinlemeye basla
+            logger.info(f"✅ WebSocket bağlantısı kuruldu: {self.ws_url}")
+        # Gelen mesajları dinlemeye başla
         asyncio.create_task(self._receive_loop())
-        # Periyodik heartbeat dongusunu baslat
+        # Periyodik heartbeat döngüsünü başlat
         asyncio.create_task(self._send_loop())
 
     async def _receive_loop(self):
         """
-        WebSocket uzerinden gelen her mesaji alir.
-        Eger on_message callback atanmissa oraya, degilse verbose modda logger.info'e yollar.
-        Baglanti kapanirsa otomatik reconnect dener.
+        WebSocket üzerinden gelen her mesajı alır.
+        Eğer on_message callback atanmışsa oraya, değilse verbose modda logger.info'e yollar.
+        Bağlantı kapanırsa otomatik reconnect dener.
         """
         assert self._ws is not None
         try:
@@ -653,31 +666,31 @@ class WebSocket:
                     logger.info("Gelen mesaj: %s", msg)
         except websockets.ConnectionClosed:
             if self.verbose:
-                logger.info("🔄 Baglanti kapandi, yeniden baglaniliyor...")
+                logger.info("🔄 Bağlantı kapandı, yeniden bağlanılıyor...")
             await self.connect()
 
     async def _send_loop(self):
         """
         Belirlenen interval kadar bekleyip her seferinde
-        sadece H tipi heartbeat mesaji yollar.
+        sadece H tipi heartbeat mesajı yollar.
         """
         assert self._ws is not None
         while True:
             now = time.time()
             if now - self._last_heartbeat >= self.heartbeat_interval:
                 self._last_heartbeat = now
-                # Heartbeat mesaji
+                # Heartbeat mesajı
                 await self._send({
                     "Token": self._jwt_token,
                     "Type": "H",
                     "Symbols": []
                 })
-            # CPU kullanimini sinirlamak icin kisa uyku
+            # CPU kullanımını sınırlamak için kısa uyku
             await asyncio.sleep(1)
 
     async def _send(self, payload: dict):
         """
-        Verilen sozlugu JSON'a cevirir ve WebSocket uzerinden gonderir.
+        Verilen sözlüğü JSON'a çevirir ve WebSocket üzerinden gönderir.
         """
         assert self._ws is not None
         msg = json.dumps(payload)
@@ -688,6 +701,6 @@ class WebSocket:
 
     def start(self):
         """
-        Senkron olarak event loop baslatir ve connect() metodunu calistirir.
+        Senkron olarak event loop başlatır ve connect() metodunu çalıştırır.
         """
         asyncio.get_event_loop().run_until_complete(self.connect())

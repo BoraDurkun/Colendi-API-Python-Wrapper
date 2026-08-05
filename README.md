@@ -98,7 +98,7 @@ ORDER_DURATION_DESCRIPTION_MAP = {
 python terminal_app.py
 ```
 
-Uygulama acilista API bilgilerini gosterir. Kayitli token varsa once onu dener; token gecersizse SMS OTP akisina gecer.
+Uygulama acilista API bilgilerini gosterir. Kayitli token varsa once onu dener; token gecersizse giris akisi baslar. `LoginSendOtp` yaniti bir `accessToken` donerse (SMS OTP'si kapatilmis kullanicilar), token kaydedilir ve SMS adimi atlanir. Aksi halde mevcut SMS OTP akisi devam eder.
 
 Ana menu:
 
@@ -233,8 +233,9 @@ api = API.get_api(
 )
 
 otp_response = api.send_otp(USERNAME, PASSWORD)
-otp_code = input("SMS kodu: ")
-login_response = api.login(otp_code, user_name=USERNAME, password=PASSWORD)
+if not api._jwt_token:
+    otp_code = input("SMS kodu: ")
+    login_response = api.login(otp_code, user_name=USERNAME, password=PASSWORD)
 
 portfolio = api.get_portfolio_stock()
 

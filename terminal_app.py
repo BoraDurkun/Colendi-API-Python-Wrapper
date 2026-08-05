@@ -194,6 +194,12 @@ def rich_login():
             console.print("[error]OTP isteği başarısız.[/error]", otp)
             sys.exit()
 
+        # SMS OTP'si kapatılmış kullanıcılar LoginSendOtp yanıtında doğrudan
+        # accessToken alır; api_client bu token'ı zaten kaydedip kullanıma açar.
+        if getattr(api, "_jwt_token", None):
+            console.print("[success]✅ SMS doğrulaması gerekmiyor; giriş başarılı.[/success]")
+            return
+
         console.print("\n[prompt]SMS kodu:[/prompt] ", end="")
         code = input().strip()
 

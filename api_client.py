@@ -276,9 +276,21 @@ class API:
         "userName": İnternet şubesi kullanıcı giriş bilgisi. String değer girilmelidir.
         "password": İnternet şubesi kullanıcı şifresi. String değer girilmelidir.
         """
-        return self._post("/Login/LoginSendOtp",
+        resp = self._post("/Login/LoginSendOtp",
                           {"userName": internet_user, "password": password},
                           require_auth=False)
+
+        # SMS OTP'si kapatılmış kullanıcılar bu endpoint'ten doğrudan token
+        # alabilir. Bu durumda LoginVerifyOtp çağrısı yapmadan oturumu kur.
+        data = resp.get("data") or resp.get("Data") or {}
+        access_token = data.get("accessToken") or data.get("AccessToken")
+        if access_token:
+            self._jwt_token = access_token
+            self._save_token()
+            if self.verbose:
+                logger.info("LoginSendOtp yanıtından JWT token kaydedildi.")
+
+        return resp
 
     def login(
         self,

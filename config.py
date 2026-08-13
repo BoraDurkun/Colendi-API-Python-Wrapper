@@ -12,7 +12,7 @@ Uygulamanın temel konfigürasyon değerlerini içerir:
 # API URL ve WebSocket
 # ——————————————————————————————————————————————————————————————————————————————
 
-API_HOST   = "https://api-client.colendimenkul.com/"
+API_HOST   = "https://api-client.kuzeymenkul.com/"
 API_URL    = API_HOST
 
 # ——————————————————————————————————————————————————————————————————————————————

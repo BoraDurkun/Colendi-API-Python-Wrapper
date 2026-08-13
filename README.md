@@ -1,6 +1,6 @@
-# Colendi API Python Wrapper
+# Kuzey Menkul API Python Wrapper
 
-Colendi Menkul API icin HMAC imzali REST istemcisi, Rich tabanli terminal uygulamasi ve WebSocket yardimci sinifi.
+Kuzey Menkul API icin HMAC imzali REST istemcisi, Rich tabanli terminal uygulamasi ve WebSocket yardimci sinifi.
 
 Bu repo iki ana kullanim sunar:
 
@@ -9,13 +9,13 @@ Bu repo iki ana kullanim sunar:
 
 ## Dosya Yapisi
 
-| Dosya | Aciklama |
-| --- | --- |
-| `api_client.py` | HMAC imzali REST istemcisi, token saklama, throttle, session refresher ve WebSocket sinifi |
-| `terminal_app.py` | Rich tabanli interaktif terminal uygulamasi |
-| `config.py` | API URL, client key/secret, kullanici bilgileri ve CLI enum haritalari |
-| `ws_logger.py` | WebSocket mesajlarini ayri pencerede izlemek icin yardimci logger |
-| `api_settings.json` | Login sonrasi olusan JWT token cache dosyasi |
+| Dosya                 | Aciklama                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `api_client.py`     | HMAC imzali REST istemcisi, token saklama, throttle, session refresher ve WebSocket sinifi |
+| `terminal_app.py`   | Rich tabanli interaktif terminal uygulamasi                                                |
+| `config.py`         | API URL, client key/secret, kullanici bilgileri ve CLI enum haritalari                     |
+| `ws_logger.py`      | WebSocket mesajlarini ayri pencerede izlemek icin yardimci logger                          |
+| `api_settings.json` | Login sonrasi olusan JWT token cache dosyasi                                               |
 
 Not: `config.py` ve `api_settings.json` icinde hassas bilgi bulunabilir. Bu dosyalari paylasmadan once kontrol edin.
 
@@ -37,13 +37,13 @@ pip install -r requirements.txt
 `config.py` icindeki alanlari doldurun:
 
 ```python
-API_HOST = "https://api-client.colendimenkul.com/"
+API_HOST = "https://api-client.kuzeymenkul.com/"
 API_URL = API_HOST
 
-CLIENT_KEY = "mail ile paylasilan client key"
-CLIENT_SECRET = "mail ile paylasilan client secret"
-USERNAME = "Colendi musteri numaraniz"
-PASSWORD = "Colendi hesap sifreniz"
+CLIENT_KEY = "" # Sizinle mail olarak paylaşılan Client Key'i buraya yapıştırın.
+CLIENT_SECRET = "" # Sizinle mail olarak paylaşılan Client Secret'ı buraya yapıştırın.
+USERNAME = "" # Kuzey Menkul Müşteri numaranızı buraya yapıştırın.
+PASSWORD = ""# Kuzey Menkul hesabınızın şifresini buraya yapıştırın.
 ```
 
 CLI menulerinde kullanilan enum degerleri de ayni dosyada tutulur:
@@ -115,28 +115,28 @@ Ana menu:
 
 ### Authentication
 
-| Metot | Endpoint |
-| --- | --- |
-| `send_otp(internet_user, password)` | `/Login/LoginSendOtp` |
+| Metot                                            | Endpoint                  |
+| ------------------------------------------------ | ------------------------- |
+| `send_otp(internet_user, password)`            | `/Login/LoginSendOtp`   |
 | `login(otp_code, user_name=..., password=...)` | `/Login/LoginVerifyOtp` |
 
 ### Portfolio
 
-| Metot | Endpoint |
-| --- | --- |
-| `get_portfolio_stock()` | `/Portfolio/PortfolioStock` |
+| Metot                      | Endpoint                       |
+| -------------------------- | ------------------------------ |
+| `get_portfolio_stock()`  | `/Portfolio/PortfolioStock`  |
 | `get_portfolio_future()` | `/Portfolio/PortfolioFuture` |
-| `get_portfolio_fund()` | `/Portfolio/PortfolioFund` |
+| `get_portfolio_fund()`   | `/Portfolio/PortfolioFund`   |
 
 ### Stock
 
-| Metot | Endpoint |
-| --- | --- |
-| `new_stock_order(...)` | `/Stock/NewStockOrder` |
+| Metot                                   | Endpoint                    |
+| --------------------------------------- | --------------------------- |
+| `new_stock_order(...)`                | `/Stock/NewStockOrder`    |
 | `update_stock_order(order_no, price)` | `/Stock/UpdateStockOrder` |
-| `cancel_stock_order(order_no)` | `/Stock/CancelStockOrder` |
-| `get_stock_orders(start_date=None)` | `/Stock/StockOrders` |
-| `get_stock_order_detail(order_no)` | `/Stock/StockOrderDetail` |
+| `cancel_stock_order(order_no)`        | `/Stock/CancelStockOrder` |
+| `get_stock_orders(start_date=None)`   | `/Stock/StockOrders`      |
+| `get_stock_order_detail(order_no)`    | `/Stock/StockOrderDetail` |
 
 `get_stock_orders` icin tarih parametresi Python tarafinda `datetime` olarak verilir:
 
@@ -166,56 +166,56 @@ Yeni kodda `start_date=` kullanilmasi onerilir.
 
 Hisse senedi emirleri icin durum kodlari:
 
-| Durum Kodu | Karsiligi |
-| --- | --- |
-| `Y` | BIST'de |
-| `Z` | Sistemde |
-| `X` | Sistemde tahta kapali |
-| `G` | Gerceklesen |
-| `H` | Gun Iptal |
-| `T` | Iptal |
-| `R` | Red |
+| Durum Kodu | Karsiligi             |
+| ---------- | --------------------- |
+| `Y`      | BIST'de               |
+| `Z`      | Sistemde              |
+| `X`      | Sistemde tahta kapali |
+| `G`      | Gerceklesen           |
+| `H`      | Gun Iptal             |
+| `T`      | Iptal                 |
+| `R`      | Red                   |
 
 ### Future
 
-| Metot | Endpoint |
-| --- | --- |
-| `new_future_order(...)` | `/Future/NewFutureOrder` |
+| Metot                                    | Endpoint                      |
+| ---------------------------------------- | ----------------------------- |
+| `new_future_order(...)`                | `/Future/NewFutureOrder`    |
 | `update_future_order(order_no, price)` | `/Future/UpdateFutureOrder` |
-| `cancel_future_order(order_no)` | `/Future/CancelFutureOrder` |
-| `get_future_orders()` | `/Future/FutureOrders` |
-| `get_future_order_detail(order_no)` | `/Future/FutureOrderDetail` |
+| `cancel_future_order(order_no)`        | `/Future/CancelFutureOrder` |
+| `get_future_orders()`                  | `/Future/FutureOrders`      |
+| `get_future_order_detail(order_no)`    | `/Future/FutureOrderDetail` |
 
 VIOP emirleri icin durum kodlari:
 
-| Durum Kodu | Karsiligi |
-| --- | --- |
-| `Y` | BIST'de |
-| `Z` | Sistemde |
-| `G` | Gerceklesen |
-| `H` | Gun Iptal |
-| `T` | Iptal |
-| `R` | Red |
-| `S` | Askida |
-| `K` | Risk Kontrolu |
+| Durum Kodu | Karsiligi     |
+| ---------- | ------------- |
+| `Y`      | BIST'de       |
+| `Z`      | Sistemde      |
+| `G`      | Gerceklesen   |
+| `H`      | Gun Iptal     |
+| `T`      | Iptal         |
+| `R`      | Red           |
+| `S`      | Askida        |
+| `K`      | Risk Kontrolu |
 
 ### Fund
 
-| Metot | Endpoint |
-| --- | --- |
-| `get_available_fund_list()` | `/Fund/AvaiableFundList` |
-| `get_fund_orders()` | `/Fund/FundOrders` |
-| `new_fund_order(fund_id, buy_sell, quantity, price)` | `/Fund/NewFundOrder` |
-| `cancel_fund_order(order_no)` | `/Fund/CancelFundOrder` |
+| Metot                                                  | Endpoint                   |
+| ------------------------------------------------------ | -------------------------- |
+| `get_available_fund_list()`                          | `/Fund/AvaiableFundList` |
+| `get_fund_orders()`                                  | `/Fund/FundOrders`       |
+| `new_fund_order(fund_id, buy_sell, quantity, price)` | `/Fund/NewFundOrder`     |
+| `cancel_fund_order(order_no)`                        | `/Fund/CancelFundOrder`  |
 
 Fon emirleri icin durum kodlari:
 
-| Durum Kodu | Karsiligi |
-| --- | --- |
-| `ES` | Gerceklesmeyi Bekliyor |
-| `MK` | MKK Sisteminde |
-| `IP` | Iptal Edildi |
-| `OK` | Gerceklesti |
+| Durum Kodu | Karsiligi              |
+| ---------- | ---------------------- |
+| `ES`     | Gerceklesmeyi Bekliyor |
+| `MK`     | MKK Sisteminde         |
+| `IP`     | Iptal Edildi           |
+| `OK`     | Gerceklesti            |
 
 ## Python Kodundan Kullanim
 

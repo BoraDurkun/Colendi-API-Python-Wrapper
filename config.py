@@ -21,8 +21,8 @@ API_URL    = API_HOST
 
 CLIENT_KEY = "" # Sizinle mail olarak paylaşılan Client Key'i buraya yapıştırın.
 CLIENT_SECRET = "" # Sizinle mail olarak paylaşılan Client Secret'ı buraya yapıştırın.
-USERNAME = "" # Colendi Müşteri numaranızı buraya yapıştırın.
-PASSWORD = ""# Colendi hesabınızın şifresini buraya yapıştırın.
+USERNAME = "" # Kuzey Menkul Müşteri numaranızı buraya yapıştırın.
+PASSWORD = ""# Kuzey Menkul hesabınızın şifresini buraya yapıştırın.
 
 # ——————————————————————————————————————————————————————————————————————————————
 # CLI Menüleri için Enum → String Haritaları
